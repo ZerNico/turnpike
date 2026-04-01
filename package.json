@@ -1,0 +1,28 @@
+{
+  "name": "turnpike",
+  "private": true,
+  "type": "module",
+  "module": "src/index.ts",
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "dev": "bun --watch run src/index.ts",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check"
+  },
+  "dependencies": {
+    "@discordjs/voice": "^0.19.2",
+    "@noble/ciphers": "^2.1.1",
+    "discord.js": "^14.26.0",
+    "youtube-sr": "^4.3.12"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "oxfmt": "^0.43.0",
+    "oxlint": "^1.58.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}

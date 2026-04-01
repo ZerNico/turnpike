@@ -1,0 +1,12 @@
+node_modules
+.git
+.env
+.cursor
+dist
+out
+coverage
+*.tgz
+*.log
+.DS_Store
+.idea
+terminals
