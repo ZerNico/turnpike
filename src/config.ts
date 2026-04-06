@@ -8,4 +8,5 @@ export const config = {
   token,
   spotifyClientId: Bun.env.SPOTIFY_CLIENT_ID,
   spotifyClientSecret: Bun.env.SPOTIFY_CLIENT_SECRET,
+  ytdlpCookiesFile: Bun.env.YTDLP_COOKIES_FILE,
 } as const;

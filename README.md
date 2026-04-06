@@ -25,11 +25,18 @@ cp .env.example .env
 
 ```
 DISCORD_TOKEN=your_bot_token_here
+
+# Optional: enables Spotify search + link support
 SPOTIFY_CLIENT_ID=
 SPOTIFY_CLIENT_SECRET=
+
+# Optional: path to cookies.txt for yt-dlp (age-restricted videos, etc.)
+YTDLP_COOKIES_FILE=
 ```
 
 Get Spotify credentials from the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard). If configured, Spotify becomes the default search provider. Without it, everything works with YouTube only.
+
+For cookies, export your YouTube cookies using the "Get cookies.txt LOCALLY" browser extension and point `YTDLP_COOKIES_FILE` to the file. This enables playback of age-restricted videos.
 
 3. Start the bot:
 
@@ -70,6 +77,12 @@ Slash commands are automatically registered with Discord on startup.
 ```bash
 docker build -t turnpike .
 docker run --env-file .env turnpike
+```
+
+With cookies:
+
+```bash
+docker run --env-file .env -v ./cookies.txt:/app/cookies.txt -e YTDLP_COOKIES_FILE=/app/cookies.txt turnpike
 ```
 
 Or pull from GHCR:
