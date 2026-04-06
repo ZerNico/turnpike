@@ -17,6 +17,7 @@ import { queueCmd } from "./commands/queue.ts";
 import { pauseCmd } from "./commands/pause.ts";
 import { shuffleCmd } from "./commands/shuffle.ts";
 import { removeCmd } from "./commands/remove.ts";
+import { unskipCmd } from "./commands/unskip.ts";
 
 const commands = new Collection<string, Command>();
 commands.set(play.data.name, play);
@@ -26,6 +27,7 @@ commands.set(queueCmd.data.name, queueCmd);
 commands.set(pauseCmd.data.name, pauseCmd);
 commands.set(shuffleCmd.data.name, shuffleCmd);
 commands.set(removeCmd.data.name, removeCmd);
+commands.set(unskipCmd.data.name, unskipCmd);
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],

@@ -26,6 +26,7 @@ export function getOrCreateQueue(
     if (queue) {
       if (queue.idleTimeout) clearTimeout(queue.idleTimeout);
       queue.tracks = [];
+      queue.history = [];
       queue.currentTrack = null;
       queues.delete(guildId);
     }
@@ -33,6 +34,7 @@ export function getOrCreateQueue(
 
   const queue: GuildQueue = {
     tracks: [],
+    history: [],
     currentTrack: null,
     player,
     connection,
@@ -75,6 +77,11 @@ export function playNext(guildId: string): Track | null {
   if (queue.idleTimeout) {
     clearTimeout(queue.idleTimeout);
     queue.idleTimeout = null;
+  }
+
+  // push the finished track to history
+  if (queue.currentTrack) {
+    queue.history.push(queue.currentTrack);
   }
 
   // loop instead of recursion to avoid stack overflow on repeated failures
@@ -126,6 +133,7 @@ export function destroyQueue(guildId: string): void {
   }
 
   queue.tracks = [];
+  queue.history = [];
   queue.currentTrack = null;
   leaveChannel(queue.connection, queue.player);
   queues.delete(guildId);
@@ -165,6 +173,44 @@ export function removeTrack(guildId: string, position: number): Track | null {
 
   const [removed] = queue.tracks.splice(index, 1);
   return removed ?? null;
+}
+
+export function unskip(guildId: string): Track | null {
+  const queue = queues.get(guildId);
+  if (!queue || queue.history.length === 0) return null;
+
+  // put the current track back at the front of the queue
+  if (queue.currentTrack) {
+    queue.tracks.unshift(queue.currentTrack);
+  }
+
+  const prev = queue.history.pop()!;
+  queue.currentTrack = prev;
+
+  if (queue.idleTimeout) {
+    clearTimeout(queue.idleTimeout);
+    queue.idleTimeout = null;
+  }
+
+  try {
+    const resource = createTrackResource(prev);
+    queue.player.play(resource);
+    return prev;
+  } catch (error) {
+    console.error(`[Queue ${guildId}] Failed to create resource for "${prev.title}":`, error);
+    queue.currentTrack = null;
+    playNext(guildId);
+    return null;
+  }
+}
+
+export function clearQueue(guildId: string): number {
+  const queue = queues.get(guildId);
+  if (!queue) return 0;
+
+  const count = queue.tracks.length;
+  queue.tracks = [];
+  return count;
 }
 
 export function getQueueInfo(guildId: string): {

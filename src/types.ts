@@ -19,6 +19,7 @@ export interface Track {
 
 export interface GuildQueue {
   tracks: Track[];
+  history: Track[];
   currentTrack: Track | null;
   player: AudioPlayer;
   connection: VoiceConnection;
