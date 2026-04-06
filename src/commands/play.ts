@@ -33,16 +33,16 @@ export const play: Command = {
 
     try {
       const provider = registry.getDefault();
-      const results = await provider.search(query, 5);
+      const results = await provider.search(query, 10);
 
       await interaction.respond(
-        results.map((result) => ({
-          name: `${result.title} — ${result.artist} (${formatDuration(result.duration)})`.slice(
-            0,
-            100,
-          ),
-          value: result.url,
-        })),
+        results.map((result) => {
+          const label =
+            result.type === "album"
+              ? `💿 ${result.title} — ${result.artist} (${result.totalTracks} tracks)`
+              : `🎵 ${result.title} — ${result.artist} (${formatDuration(result.duration)})`;
+          return { name: label.slice(0, 100), value: result.url };
+        }),
       );
     } catch (error) {
       console.error("[Play autocomplete] Error:", error);

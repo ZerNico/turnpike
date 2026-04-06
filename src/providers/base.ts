@@ -8,6 +8,8 @@ export interface SearchResult {
   url: string;
   thumbnail?: string;
   provider: string;
+  type?: "track" | "album" | "playlist";
+  totalTracks?: number;
 }
 
 // resolve() must return a Track with a youtubeUrl so yt-dlp can stream it

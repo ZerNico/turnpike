@@ -83,32 +83,45 @@ export class SpotifyProvider implements SearchProvider {
     };
   }
 
-  async search(query: string, limit = 5): Promise<SearchResult[]> {
+  async search(query: string, limit = 10): Promise<SearchResult[]> {
     if (!query.trim()) return [];
 
-    // request extra results so we still have enough after deduplication
+    const trackLimit = Math.max(3, limit - 3);
+    const albumLimit = 3;
+
     const params = new URLSearchParams({
       q: query,
-      type: "track",
-      limit: String(limit * 3),
+      type: "track,album",
+      limit: String(trackLimit * 3),
     });
 
     const data = await this.api<SpotifySearchResponse>(`/search?${params}`);
-    const items = data.tracks?.items ?? [];
 
-    // dedupe by "artist - title" to avoid the same song from different albums
     const seen = new Set<string>();
-    const results: SearchResult[] = [];
-
-    for (const track of items) {
+    const tracks: SearchResult[] = [];
+    for (const track of data.tracks?.items ?? []) {
       const key = `${track.artists.map((a) => a.name).join(", ")} - ${track.name}`.toLowerCase();
       if (seen.has(key)) continue;
       seen.add(key);
-      results.push(this.spotifyTrackToResult(track));
-      if (results.length >= limit) break;
+      tracks.push({ ...this.spotifyTrackToResult(track), type: "track" });
+      if (tracks.length >= trackLimit) break;
     }
 
-    return results;
+    const albums: SearchResult[] = (data.albums?.items ?? [])
+      .slice(0, albumLimit)
+      .map((album) => ({
+        id: album.id,
+        title: album.name,
+        artist: album.artists.map((a) => a.name).join(", "),
+        duration: 0,
+        url: album.external_urls?.spotify ?? `https://open.spotify.com/album/${album.id}`,
+        thumbnail: album.images?.[0]?.url,
+        provider: this.name,
+        type: "album" as const,
+        totalTracks: album.total_tracks,
+      }));
+
+    return [...tracks, ...albums];
   }
 
   async resolve(result: SearchResult, requestedBy: string): Promise<Track> {
@@ -210,8 +223,18 @@ interface SpotifyTrack {
   album?: { images?: SpotifyImage[] };
 }
 
+interface SpotifySearchAlbum {
+  id: string;
+  name: string;
+  artists: SpotifyArtist[];
+  total_tracks: number;
+  images?: SpotifyImage[];
+  external_urls?: { spotify: string };
+}
+
 interface SpotifySearchResponse {
   tracks?: { items: SpotifyTrack[] };
+  albums?: { items: SpotifySearchAlbum[] };
 }
 
 interface SpotifyAlbum {
