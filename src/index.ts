@@ -18,6 +18,7 @@ import { pauseCmd } from "./commands/pause.ts";
 import { shuffleCmd } from "./commands/shuffle.ts";
 import { removeCmd } from "./commands/remove.ts";
 import { unskipCmd } from "./commands/unskip.ts";
+import { clearCmd } from "./commands/clear.ts";
 
 const commands = new Collection<string, Command>();
 commands.set(play.data.name, play);
@@ -28,6 +29,7 @@ commands.set(pauseCmd.data.name, pauseCmd);
 commands.set(shuffleCmd.data.name, shuffleCmd);
 commands.set(removeCmd.data.name, removeCmd);
 commands.set(unskipCmd.data.name, unskipCmd);
+commands.set(clearCmd.data.name, clearCmd);
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
