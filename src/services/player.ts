@@ -20,11 +20,9 @@ export function createTrackResource(track: Track) {
 
   ytdlpArgs.push(track.youtubeUrl);
 
-  const ytdlp = spawn("yt-dlp", ytdlpArgs,
-    {
-      stdio: ["ignore", "pipe", "ignore"],
-    },
-  );
+  const ytdlp = spawn("yt-dlp", ytdlpArgs, {
+    stdio: ["ignore", "pipe", "ignore"],
+  });
 
   const ffmpeg = spawn(
     "ffmpeg",
@@ -49,6 +47,9 @@ export function createTrackResource(track: Track) {
   );
 
   ytdlp.stdout!.pipe(ffmpeg.stdin!);
+
+  // suppress EPIPE errors that occur when skipping (stream killed mid-write)
+  ffmpeg.stdin!.on("error", () => {});
 
   const resource = createAudioResource(ffmpeg.stdout!, {
     inputType: StreamType.OggOpus,

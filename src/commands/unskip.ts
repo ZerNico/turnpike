@@ -4,9 +4,7 @@ import { getQueue, unskip } from "../services/queue.ts";
 import { formatDuration } from "../utils.ts";
 
 export const unskipCmd: Command = {
-  data: new SlashCommandBuilder()
-    .setName("unskip")
-    .setDescription("Go back to the previous track"),
+  data: new SlashCommandBuilder().setName("unskip").setDescription("Go back to the previous track"),
 
   async execute(interaction) {
     if (!interaction.guildId) {

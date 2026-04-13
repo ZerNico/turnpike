@@ -21,6 +21,7 @@ export interface GuildQueue {
   tracks: Track[];
   history: Track[];
   currentTrack: Track | null;
+  autoplay: boolean;
   player: AudioPlayer;
   connection: VoiceConnection;
   textChannelId: string;

@@ -107,19 +107,17 @@ export class SpotifyProvider implements SearchProvider {
       if (tracks.length >= trackLimit) break;
     }
 
-    const albums: SearchResult[] = (data.albums?.items ?? [])
-      .slice(0, albumLimit)
-      .map((album) => ({
-        id: album.id,
-        title: album.name,
-        artist: album.artists.map((a) => a.name).join(", "),
-        duration: 0,
-        url: album.external_urls?.spotify ?? `https://open.spotify.com/album/${album.id}`,
-        thumbnail: album.images?.[0]?.url,
-        provider: this.name,
-        type: "album" as const,
-        totalTracks: album.total_tracks,
-      }));
+    const albums: SearchResult[] = (data.albums?.items ?? []).slice(0, albumLimit).map((album) => ({
+      id: album.id,
+      title: album.name,
+      artist: album.artists.map((a) => a.name).join(", "),
+      duration: 0,
+      url: album.external_urls?.spotify ?? `https://open.spotify.com/album/${album.id}`,
+      thumbnail: album.images?.[0]?.url,
+      provider: this.name,
+      type: "album" as const,
+      totalTracks: album.total_tracks,
+    }));
 
     return [...tracks, ...albums];
   }

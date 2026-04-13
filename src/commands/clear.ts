@@ -27,6 +27,8 @@ export const clearCmd: Command = {
     }
 
     const count = clearQueue(interaction.guildId);
-    await interaction.reply(`🗑️ Cleared **${count}** track${count === 1 ? "" : "s"} from the queue.`);
+    await interaction.reply(
+      `🗑️ Cleared **${count}** track${count === 1 ? "" : "s"} from the queue.`,
+    );
   },
 };

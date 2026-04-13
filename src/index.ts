@@ -19,6 +19,11 @@ import { shuffleCmd } from "./commands/shuffle.ts";
 import { removeCmd } from "./commands/remove.ts";
 import { unskipCmd } from "./commands/unskip.ts";
 import { clearCmd } from "./commands/clear.ts";
+import { autoplayCmd } from "./commands/autoplay.ts";
+
+process.on("unhandledRejection", (error) => {
+  console.error("[Unhandled Rejection]", error);
+});
 
 const commands = new Collection<string, Command>();
 commands.set(play.data.name, play);
@@ -30,6 +35,7 @@ commands.set(shuffleCmd.data.name, shuffleCmd);
 commands.set(removeCmd.data.name, removeCmd);
 commands.set(unskipCmd.data.name, unskipCmd);
 commands.set(clearCmd.data.name, clearCmd);
+commands.set(autoplayCmd.data.name, autoplayCmd);
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
@@ -83,15 +89,19 @@ client.on(Events.InteractionCreate, async (interaction) => {
     } catch (error) {
       console.error(`[Command ${interaction.commandName}] Error:`, error);
 
-      const reply = {
-        content: "Something went wrong executing that command.",
-        flags: MessageFlags.Ephemeral,
-      };
+      try {
+        const reply = {
+          content: "Something went wrong executing that command.",
+          flags: MessageFlags.Ephemeral,
+        };
 
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp(reply);
-      } else {
-        await interaction.reply(reply);
+        if (interaction.replied || interaction.deferred) {
+          await interaction.followUp(reply);
+        } else {
+          await interaction.reply(reply);
+        }
+      } catch {
+        // interaction expired or already handled
       }
     }
 
