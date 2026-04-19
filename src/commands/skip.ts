@@ -1,6 +1,6 @@
 import { MessageFlags, SlashCommandBuilder } from "discord.js";
 import type { Command } from "../types.ts";
-import { getQueue, skip } from "../services/queue.ts";
+import { queueManager } from "../services/queue.ts";
 import { formatDuration } from "../utils.ts";
 
 export const skipCmd: Command = {
@@ -23,7 +23,7 @@ export const skipCmd: Command = {
       return;
     }
 
-    const queue = getQueue(interaction.guildId);
+    const queue = queueManager.get(interaction.guildId);
 
     if (!queue || !queue.currentTrack) {
       await interaction.reply({
@@ -34,7 +34,7 @@ export const skipCmd: Command = {
     }
 
     const count = interaction.options.getInteger("count") ?? 1;
-    const { skipped, next } = skip(interaction.guildId, count);
+    const { skipped, next } = queue.skip(count);
 
     if (skipped.length === 0) {
       await interaction.reply("Nothing to skip.");

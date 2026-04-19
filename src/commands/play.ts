@@ -3,7 +3,7 @@ import type { Command } from "../types.ts";
 import { registry } from "../providers/registry.ts";
 import { YouTubeProvider } from "../providers/youtube.ts";
 import { SpotifyProvider } from "../providers/spotify.ts";
-import { getOrCreateQueue, enqueue } from "../services/queue.ts";
+import { queueManager } from "../services/queue.ts";
 import {
   formatDuration,
   replyWithTrackStatus,
@@ -73,9 +73,12 @@ export const play: Command = {
     await interaction.deferReply();
 
     try {
-      getOrCreateQueue(interaction.guildId, member.voice.channel, interaction.channelId);
+      const queue = queueManager.getOrCreate(
+        interaction.guildId,
+        member.voice.channel,
+        interaction.channelId,
+      );
 
-      // YouTube playlist
       if (YouTubeProvider.isPlaylistUrl(query)) {
         const ytProvider = registry.get("youtube") as YouTubeProvider;
         const { name, results } = await ytProvider.getPlaylist(query);
@@ -86,7 +89,7 @@ export const play: Command = {
         }
 
         const { added, failed } = await enqueueMultiple(
-          interaction.guildId,
+          queue,
           results,
           ytProvider,
           interaction.user.id,
@@ -98,7 +101,6 @@ export const play: Command = {
         return;
       }
 
-      // YouTube single video
       if (YouTubeProvider.isYouTubeUrl(query)) {
         const ytProvider = registry.get("youtube") as YouTubeProvider;
         const result = await ytProvider.getVideo(query);
@@ -107,12 +109,11 @@ export const play: Command = {
           return;
         }
         const track = await ytProvider.resolve(result, interaction.user.id);
-        enqueue(interaction.guildId, track);
-        await replyWithTrackStatus(interaction, track, interaction.guildId);
+        queue.enqueue(track);
+        await replyWithTrackStatus(interaction, track, queue);
         return;
       }
 
-      // Spotify link
       if (SpotifyProvider.isSpotifyUrl(query)) {
         const spotifyProvider = registry.get("spotify") as SpotifyProvider;
         const parsed = SpotifyProvider.parseSpotifyUrl(query);
@@ -128,8 +129,8 @@ export const play: Command = {
             return;
           }
           const track = await spotifyProvider.resolve(result, interaction.user.id);
-          enqueue(interaction.guildId, track);
-          await replyWithTrackStatus(interaction, track, interaction.guildId);
+          queue.enqueue(track);
+          await replyWithTrackStatus(interaction, track, queue);
           return;
         }
 
@@ -147,7 +148,7 @@ export const play: Command = {
           }
 
           const { added, failed } = await enqueueMultiple(
-            interaction.guildId,
+            queue,
             results,
             spotifyProvider,
             interaction.user.id,
@@ -161,7 +162,6 @@ export const play: Command = {
         }
       }
 
-      // Text search via default provider
       const provider = registry.getDefault();
       const results = await provider.search(query, 1);
       if (results.length === 0) {
@@ -170,8 +170,8 @@ export const play: Command = {
       }
 
       const track = await provider.resolve(results[0]!, interaction.user.id);
-      enqueue(interaction.guildId, track);
-      await replyWithTrackStatus(interaction, track, interaction.guildId);
+      queue.enqueue(track);
+      await replyWithTrackStatus(interaction, track, queue);
     } catch (error) {
       console.error("[Play] Error:", error);
       await interaction.editReply("Something went wrong while trying to play that track.");

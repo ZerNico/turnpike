@@ -4,7 +4,7 @@ import type { Track } from "../types.ts";
 import { config } from "../config.ts";
 
 // yt-dlp → ffmpeg (loudnorm) → AudioResource
-export function createTrackResource(track: Track) {
+export function createTrackResource(track: Track, startSeconds = 0) {
   const ytdlpArgs = [
     "--no-warnings",
     "--no-playlist",
@@ -29,6 +29,7 @@ export function createTrackResource(track: Track) {
     [
       "-i",
       "pipe:0",
+      ...(startSeconds > 0 ? ["-ss", String(startSeconds)] : []),
       "-af",
       "loudnorm=I=-14:TP=-1:LRA=11",
       "-f",

@@ -25,9 +25,11 @@ FROM alpine:3.23
 RUN apk add --no-cache yt-dlp ffmpeg
 
 RUN addgroup -S app && adduser -S app -G app
-USER app
 
 WORKDIR /app
 COPY --from=build /app/app ./app
+RUN mkdir -p /app/data && chown app:app /app/data
+
+USER app
 
 CMD ["./app"]

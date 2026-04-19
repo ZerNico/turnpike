@@ -1,6 +1,6 @@
 import { MessageFlags, SlashCommandBuilder } from "discord.js";
 import type { Command } from "../types.ts";
-import { getQueue } from "../services/queue.ts";
+import { queueManager } from "../services/queue.ts";
 
 export const autoplayCmd: Command = {
   data: new SlashCommandBuilder()
@@ -16,7 +16,7 @@ export const autoplayCmd: Command = {
       return;
     }
 
-    const queue = getQueue(interaction.guildId);
+    const queue = queueManager.get(interaction.guildId);
 
     if (!queue) {
       await interaction.reply({
@@ -26,9 +26,10 @@ export const autoplayCmd: Command = {
       return;
     }
 
-    queue.autoplay = !queue.autoplay;
+    const newValue = !queue.autoplay;
+    queue.setAutoplay(newValue);
 
-    if (queue.autoplay) {
+    if (newValue) {
       await interaction.reply(
         "🔄 Autoplay **enabled** — related tracks will play when the queue ends.",
       );

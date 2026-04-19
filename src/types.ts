@@ -4,7 +4,6 @@ import type {
   SlashCommandBuilder,
   SlashCommandOptionsOnlyBuilder,
 } from "discord.js";
-import type { AudioPlayer, VoiceConnection } from "@discordjs/voice";
 
 export interface Track {
   title: string;
@@ -15,17 +14,6 @@ export interface Track {
   thumbnail?: string;
   provider: string;
   requestedBy: string;
-}
-
-export interface GuildQueue {
-  tracks: Track[];
-  history: Track[];
-  currentTrack: Track | null;
-  autoplay: boolean;
-  player: AudioPlayer;
-  connection: VoiceConnection;
-  textChannelId: string;
-  idleTimeout: ReturnType<typeof setTimeout> | null;
 }
 
 export interface Command {

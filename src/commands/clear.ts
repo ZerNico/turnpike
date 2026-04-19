@@ -1,6 +1,6 @@
 import { MessageFlags, SlashCommandBuilder } from "discord.js";
 import type { Command } from "../types.ts";
-import { getQueue, clearQueue } from "../services/queue.ts";
+import { queueManager } from "../services/queue.ts";
 
 export const clearCmd: Command = {
   data: new SlashCommandBuilder()
@@ -16,7 +16,7 @@ export const clearCmd: Command = {
       return;
     }
 
-    const queue = getQueue(interaction.guildId);
+    const queue = queueManager.get(interaction.guildId);
 
     if (!queue || queue.tracks.length === 0) {
       await interaction.reply({
@@ -26,7 +26,7 @@ export const clearCmd: Command = {
       return;
     }
 
-    const count = clearQueue(interaction.guildId);
+    const count = queue.clear();
     await interaction.reply(
       `🗑️ Cleared **${count}** track${count === 1 ? "" : "s"} from the queue.`,
     );

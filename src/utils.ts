@@ -1,6 +1,6 @@
 import type { Track } from "./types.ts";
 import type { SearchResult, SearchProvider } from "./providers/base.ts";
-import { enqueue, getQueueInfo } from "./services/queue.ts";
+import type { GuildQueue } from "./services/queue.ts";
 import type { ChatInputCommandInteraction } from "discord.js";
 
 export function formatDuration(seconds: number): string {
@@ -12,10 +12,10 @@ export function formatDuration(seconds: number): string {
 export async function replyWithTrackStatus(
   interaction: ChatInputCommandInteraction,
   track: Track,
-  guildId: string,
+  queue: GuildQueue,
 ) {
-  const info = getQueueInfo(guildId);
-  const isNowPlaying = info?.currentTrack?.youtubeUrl === track.youtubeUrl && info?.size === 0;
+  const info = queue.getInfo();
+  const isNowPlaying = info.currentTrack?.youtubeUrl === track.youtubeUrl && info.size === 0;
 
   if (isNowPlaying) {
     await interaction.editReply(
@@ -29,7 +29,7 @@ export async function replyWithTrackStatus(
 }
 
 export async function enqueueMultiple(
-  guildId: string,
+  queue: GuildQueue,
   results: SearchResult[],
   provider: SearchProvider,
   userId: string,
@@ -38,7 +38,7 @@ export async function enqueueMultiple(
   for (const result of results) {
     try {
       const track = await provider.resolve(result, userId);
-      enqueue(guildId, track);
+      queue.enqueue(track);
     } catch {
       failed++;
     }

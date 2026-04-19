@@ -1,6 +1,6 @@
 import { MessageFlags, SlashCommandBuilder } from "discord.js";
 import type { Command } from "../types.ts";
-import { getQueue, destroyQueue } from "../services/queue.ts";
+import { queueManager } from "../services/queue.ts";
 
 export const stop: Command = {
   data: new SlashCommandBuilder()
@@ -16,7 +16,7 @@ export const stop: Command = {
       return;
     }
 
-    const queue = getQueue(interaction.guildId);
+    const queue = queueManager.get(interaction.guildId);
 
     if (!queue) {
       await interaction.reply({
@@ -27,7 +27,7 @@ export const stop: Command = {
     }
 
     const trackCount = queue.tracks.length + (queue.currentTrack ? 1 : 0);
-    destroyQueue(interaction.guildId);
+    queue.destroy();
 
     await interaction.reply(
       `⏹️ Stopped playback and cleared ${trackCount} track${trackCount === 1 ? "" : "s"} from the queue.`,

@@ -9,6 +9,7 @@ import {
 } from "discord.js";
 import { config } from "./config.ts";
 import type { Command } from "./types.ts";
+import { queueManager } from "./services/queue.ts";
 
 import { play } from "./commands/play.ts";
 import { stop } from "./commands/stop.ts";
@@ -73,6 +74,15 @@ client.once(Events.ClientReady, async (readyClient) => {
   } catch (error) {
     console.error("Failed to sync slash commands:", error);
   }
+
+  try {
+    const restored = await queueManager.restore(readyClient);
+    if (restored > 0) {
+      console.log(`🔄 Restored ${restored} active session(s)`);
+    }
+  } catch (error) {
+    console.error("Failed to restore sessions:", error);
+  }
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
@@ -92,7 +102,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       try {
         const reply = {
           content: "Something went wrong executing that command.",
-          flags: MessageFlags.Ephemeral,
+          flags: MessageFlags.Ephemeral as const,
         };
 
         if (interaction.replied || interaction.deferred) {
@@ -101,7 +111,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
           await interaction.reply(reply);
         }
       } catch {
-        // interaction expired or already handled
       }
     }
 

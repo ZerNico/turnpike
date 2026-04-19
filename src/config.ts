@@ -9,4 +9,5 @@ export const config = {
   spotifyClientId: Bun.env.SPOTIFY_CLIENT_ID,
   spotifyClientSecret: Bun.env.SPOTIFY_CLIENT_SECRET,
   ytdlpCookiesFile: Bun.env.YTDLP_COOKIES_FILE,
+  databasePath: Bun.env.DATABASE_PATH ?? "./data/turnpike.db",
 } as const;

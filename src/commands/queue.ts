@@ -1,6 +1,6 @@
 import { EmbedBuilder, MessageFlags, SlashCommandBuilder } from "discord.js";
 import type { Command, Track } from "../types.ts";
-import { getQueueInfo } from "../services/queue.ts";
+import { queueManager } from "../services/queue.ts";
 import { formatDuration } from "../utils.ts";
 
 function progressBar(current: number, total: number, length = 14): string {
@@ -32,7 +32,8 @@ export const queueCmd: Command = {
       return;
     }
 
-    const info = getQueueInfo(interaction.guildId);
+    const queue = queueManager.get(interaction.guildId);
+    const info = queue?.getInfo();
 
     if (!info || (!info.currentTrack && info.size === 0)) {
       await interaction.reply({

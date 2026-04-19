@@ -1,6 +1,6 @@
 import { MessageFlags, SlashCommandBuilder } from "discord.js";
 import type { Command } from "../types.ts";
-import { getQueue, shuffle } from "../services/queue.ts";
+import { queueManager } from "../services/queue.ts";
 
 export const shuffleCmd: Command = {
   data: new SlashCommandBuilder()
@@ -16,7 +16,7 @@ export const shuffleCmd: Command = {
       return;
     }
 
-    const queue = getQueue(interaction.guildId);
+    const queue = queueManager.get(interaction.guildId);
 
     if (!queue || queue.tracks.length === 0) {
       await interaction.reply({
@@ -26,7 +26,7 @@ export const shuffleCmd: Command = {
       return;
     }
 
-    const count = shuffle(interaction.guildId);
+    const count = queue.shuffle();
     await interaction.reply(`🔀 Shuffled **${count}** upcoming tracks.`);
   },
 };

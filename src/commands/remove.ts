@@ -1,6 +1,6 @@
 import { MessageFlags, SlashCommandBuilder } from "discord.js";
 import type { Command } from "../types.ts";
-import { getQueue, removeTrack } from "../services/queue.ts";
+import { queueManager } from "../services/queue.ts";
 import { formatDuration } from "../utils.ts";
 
 export const removeCmd: Command = {
@@ -24,7 +24,7 @@ export const removeCmd: Command = {
       return;
     }
 
-    const queue = getQueue(interaction.guildId);
+    const queue = queueManager.get(interaction.guildId);
 
     if (!queue || queue.tracks.length === 0) {
       await interaction.reply({
@@ -35,7 +35,7 @@ export const removeCmd: Command = {
     }
 
     const position = interaction.options.getInteger("position", true);
-    const removed = removeTrack(interaction.guildId, position);
+    const removed = queue.remove(position);
 
     if (!removed) {
       await interaction.reply({

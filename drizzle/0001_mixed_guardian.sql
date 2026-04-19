@@ -1,0 +1,1 @@
+ALTER TABLE `guild_queues` ADD `current_position_seconds` integer DEFAULT 0 NOT NULL;
