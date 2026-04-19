@@ -1,6 +1,6 @@
 # Turnpike
 
-A Discord music bot built with TypeScript, discord.js v14, and yt-dlp. Supports YouTube and Spotify with slash commands, autocomplete search, and a per-guild queue.
+A Discord music bot built with TypeScript, discord.js v14, and yt-dlp. Supports YouTube and Spotify with slash commands, autocomplete search, a per-guild queue, autoplay based on YouTube Music radio, and session persistence that survives restarts.
 
 ## Prerequisites
 
@@ -32,6 +32,9 @@ SPOTIFY_CLIENT_SECRET=
 
 # Optional: path to cookies.txt for yt-dlp (age-restricted videos, etc.)
 YTDLP_COOKIES_FILE=
+
+# Optional: path to the SQLite database file (default: ./data/turnpike.db)
+DATABASE_PATH=
 ```
 
 Get Spotify credentials from the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard). If configured, Spotify becomes the default search provider. Without it, everything works with YouTube only.
@@ -54,15 +57,22 @@ Slash commands are automatically registered with Discord on startup.
 
 ## Commands
 
-| Command            | Description                                          |
-| ------------------ | ---------------------------------------------------- |
-| `/play <query>`    | Search or paste a link (YouTube/Spotify)             |
-| `/skip [count]`    | Skip the current track (or multiple)                 |
-| `/stop`            | Stop playback, clear queue, and disconnect           |
-| `/queue [page]`    | Show the queue with progress bar and pagination      |
-| `/pause`           | Toggle pause/resume                                  |
-| `/shuffle`         | Shuffle upcoming tracks in the queue                 |
-| `/remove <pos>`    | Remove a track from the queue by position            |
+| Command              | Description                                                    |
+| -------------------- | -------------------------------------------------------------- |
+| `/play <query>`      | Search or paste a link (YouTube/Spotify)                       |
+| `/skip [count]`      | Skip the current track (or multiple)                           |
+| `/unskip`            | Replay the previously played track                             |
+| `/stop`              | Stop playback, clear queue, and disconnect                     |
+| `/queue [page]`      | Show the queue with progress bar and pagination                |
+| `/pause`             | Toggle pause/resume                                            |
+| `/shuffle`           | Shuffle upcoming tracks in the queue                           |
+| `/remove <pos>`      | Remove a track from the queue by position                      |
+| `/clear`             | Clear all upcoming tracks but keep the current one playing     |
+| `/autoplay [on/off]` | Toggle autoplay (queue related tracks when the queue runs out) |
+
+### Session persistence
+
+Queues, playback position, pause state, and per-guild autoplay settings are stored in a local SQLite database (`./data/turnpike.db` by default). When the bot restarts, it rejoins the previous voice channel and resumes the current track roughly where it left off.
 
 ### Supported links
 
@@ -76,18 +86,20 @@ Slash commands are automatically registered with Discord on startup.
 
 ```bash
 docker build -t turnpike .
-docker run --env-file .env turnpike
+docker run --env-file .env -v turnpike-data:/app/data turnpike
 ```
+
+The `-v turnpike-data:/app/data` mount persists the SQLite database across container restarts.
 
 With cookies:
 
 ```bash
-docker run --env-file .env -v ./cookies.txt:/app/cookies.txt -e YTDLP_COOKIES_FILE=/app/cookies.txt turnpike
+docker run --env-file .env -v turnpike-data:/app/data -v ./cookies.txt:/app/cookies.txt -e YTDLP_COOKIES_FILE=/app/cookies.txt turnpike
 ```
 
 Or pull from GHCR:
 
 ```bash
 docker pull ghcr.io/zernico/turnpike:latest
-docker run --env-file .env ghcr.io/zernico/turnpike:latest
+docker run --env-file .env -v turnpike-data:/app/data ghcr.io/zernico/turnpike:latest
 ```
