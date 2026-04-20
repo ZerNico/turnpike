@@ -1,6 +1,7 @@
-import { MessageFlags, SlashCommandBuilder } from "discord.js";
+import { SlashCommandBuilder } from "discord.js";
 import { queueManager } from "../services/queue.ts";
 import type { Command } from "../types.ts";
+import { formatCommandReply, replyEphemeral } from "../utils.ts";
 
 export const sponsorblockCmd: Command = {
   data: new SlashCommandBuilder()
@@ -15,10 +16,10 @@ export const sponsorblockCmd: Command = {
 
   async execute(interaction) {
     if (!interaction.guildId) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-        flags: MessageFlags.Ephemeral,
-      });
+      await replyEphemeral(
+        interaction,
+        formatCommandReply("⚠️", "This command can only be used in a server."),
+      );
       return;
     }
 
@@ -34,11 +35,19 @@ export const sponsorblockCmd: Command = {
 
     if (newValue) {
       await interaction.reply(
-        "SponsorBlock **enabled** for this server. Newly started YouTube tracks will skip the default SponsorBlock segments.",
+        formatCommandReply(
+          "✅",
+          "SponsorBlock enabled.",
+          "Newly started YouTube tracks will skip the default SponsorBlock segments.",
+        ),
       );
     } else {
       await interaction.reply(
-        "SponsorBlock **disabled** for this server. Newly started YouTube tracks will play without SponsorBlock skipping.",
+        formatCommandReply(
+          "⏹️",
+          "SponsorBlock disabled.",
+          "Newly started YouTube tracks will play without SponsorBlock skipping.",
+        ),
       );
     }
   },

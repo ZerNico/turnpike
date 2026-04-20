@@ -1,7 +1,7 @@
-import { EmbedBuilder, MessageFlags, SlashCommandBuilder } from "discord.js";
+import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import type { Command, Track } from "../types.ts";
 import { queueManager } from "../services/queue.ts";
-import { formatDuration } from "../utils.ts";
+import { formatCommandReply, formatDuration, replyEphemeral } from "../utils.ts";
 
 function progressBar(current: number, total: number, length = 14): string {
   const filled = total > 0 ? Math.round((current / total) * length) : 0;
@@ -25,10 +25,10 @@ export const queueCmd: Command = {
 
   async execute(interaction) {
     if (!interaction.guildId) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-        flags: MessageFlags.Ephemeral,
-      });
+      await replyEphemeral(
+        interaction,
+        formatCommandReply("⚠️", "This command can only be used in a server."),
+      );
       return;
     }
 
@@ -36,10 +36,10 @@ export const queueCmd: Command = {
     const info = queue?.getInfo();
 
     if (!info || (!info.currentTrack && info.size === 0)) {
-      await interaction.reply({
-        content: "The queue is empty. Use `/play` to add some tracks!",
-        flags: MessageFlags.Ephemeral,
-      });
+      await replyEphemeral(
+        interaction,
+        formatCommandReply("⚠️", "The queue is empty.", "Use `/play` to add some tracks."),
+      );
       return;
     }
 

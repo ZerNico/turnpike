@@ -1,12 +1,35 @@
 import type { Track } from "./types.ts";
 import type { SearchResult, SearchProvider } from "./providers/base.ts";
 import type { GuildQueue } from "./services/queue.ts";
+import { MessageFlags } from "discord.js";
 import type { ChatInputCommandInteraction } from "discord.js";
 
 export function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+export function formatTrackSummary(track: Track): string {
+  return `**${track.title}** — ${track.artist} (${formatDuration(track.duration)})`;
+}
+
+export function formatTrackCount(count: number): string {
+  return `${count} track${count === 1 ? "" : "s"}`;
+}
+
+export function formatCommandReply(emoji: string, summary: string, detail?: string): string {
+  return detail ? `${emoji} ${summary}\n${detail}` : `${emoji} ${summary}`;
+}
+
+export async function replyEphemeral(
+  interaction: ChatInputCommandInteraction,
+  content: string,
+): Promise<void> {
+  await interaction.reply({
+    content,
+    flags: MessageFlags.Ephemeral,
+  });
 }
 
 export async function replyWithTrackStatus(
@@ -19,11 +42,15 @@ export async function replyWithTrackStatus(
 
   if (isNowPlaying) {
     await interaction.editReply(
-      `🎶 Now playing: **${track.title}** — ${track.artist} (${formatDuration(track.duration)})`,
+      formatCommandReply("🎶", "Now playing.", formatTrackSummary(track)),
     );
   } else {
     await interaction.editReply(
-      `✅ Added to queue: **${track.title}** — ${track.artist} (${formatDuration(track.duration)})\n📋 Position in queue: ${info?.size ?? 1}`,
+      formatCommandReply(
+        "✅",
+        "Added to the queue.",
+        `${formatTrackSummary(track)}\n📋 Position: ${info?.size ?? 1}`,
+      ),
     );
   }
 }
@@ -54,7 +81,13 @@ export function formatBulkAddReply(
   totalDuration: number,
   failed: number,
 ): string {
-  let msg = `${emoji} Added **${added}** tracks from ${label} **${name}** (${formatDuration(totalDuration)})`;
-  if (failed > 0) msg += `\n⚠️ ${failed} tracks couldn't be matched on YouTube`;
+  let msg = formatCommandReply(
+    emoji,
+    `Added ${formatTrackCount(added)} from ${label}.`,
+    `**${name}** (${formatDuration(totalDuration)})`,
+  );
+  if (failed > 0) {
+    msg += `\n⚠️ ${formatTrackCount(failed)} couldn't be matched on YouTube.`;
+  }
   return msg;
 }

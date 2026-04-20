@@ -1,7 +1,12 @@
-import { MessageFlags, SlashCommandBuilder } from "discord.js";
+import { SlashCommandBuilder } from "discord.js";
 import type { Command } from "../types.ts";
 import { queueManager } from "../services/queue.ts";
-import { formatDuration } from "../utils.ts";
+import {
+  formatCommandReply,
+  formatTrackCount,
+  formatTrackSummary,
+  replyEphemeral,
+} from "../utils.ts";
 
 export const skipCmd: Command = {
   data: new SlashCommandBuilder()
@@ -16,20 +21,17 @@ export const skipCmd: Command = {
 
   async execute(interaction) {
     if (!interaction.guildId) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-        flags: MessageFlags.Ephemeral,
-      });
+      await replyEphemeral(
+        interaction,
+        formatCommandReply("⚠️", "This command can only be used in a server."),
+      );
       return;
     }
 
     const queue = queueManager.get(interaction.guildId);
 
     if (!queue || !queue.currentTrack) {
-      await interaction.reply({
-        content: "Nothing is playing right now.",
-        flags: MessageFlags.Ephemeral,
-      });
+      await replyEphemeral(interaction, formatCommandReply("⚠️", "Nothing is playing right now."));
       return;
     }
 
@@ -37,16 +39,20 @@ export const skipCmd: Command = {
     const { skipped, next } = queue.skip(count);
 
     if (skipped.length === 0) {
-      await interaction.reply("Nothing to skip.");
+      await interaction.reply(formatCommandReply("⚠️", "Nothing was skipped."));
       return;
     }
 
     const skippedText =
-      skipped.length === 1 ? `**${skipped[0]!.title}**` : `${skipped.length} tracks`;
+      skipped.length === 1
+        ? `Skipped ${formatTrackSummary(skipped[0]!)}`
+        : `Skipped ${formatTrackCount(skipped.length)}.`;
     const nextText = next
-      ? `\n🎶 Up next: **${next.title}** — ${next.artist} (${formatDuration(next.duration)})`
-      : "\n📋 Queue is now empty.";
+      ? `🎶 Up next: ${formatTrackSummary(next)}`
+      : "📋 The queue is now empty.";
 
-    await interaction.reply(`⏭️ Skipped ${skippedText}${nextText}`);
+    await interaction.reply(
+      formatCommandReply("⏭️", "Skip complete.", `${skippedText}\n${nextText}`),
+    );
   },
 };

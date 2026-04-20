@@ -1,6 +1,7 @@
-import { MessageFlags, SlashCommandBuilder } from "discord.js";
+import { SlashCommandBuilder } from "discord.js";
 import type { Command } from "../types.ts";
 import { queueManager } from "../services/queue.ts";
+import { formatCommandReply, formatTrackCount, replyEphemeral } from "../utils.ts";
 
 export const clearCmd: Command = {
   data: new SlashCommandBuilder()
@@ -9,26 +10,23 @@ export const clearCmd: Command = {
 
   async execute(interaction) {
     if (!interaction.guildId) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-        flags: MessageFlags.Ephemeral,
-      });
+      await replyEphemeral(
+        interaction,
+        formatCommandReply("⚠️", "This command can only be used in a server."),
+      );
       return;
     }
 
     const queue = queueManager.get(interaction.guildId);
 
-    if (!queue || queue.tracks.length === 0) {
-      await interaction.reply({
-        content: "The queue is already empty.",
-        flags: MessageFlags.Ephemeral,
-      });
+    if (!queue || !queue.hasUpcomingTracks()) {
+      await replyEphemeral(interaction, formatCommandReply("⚠️", "The queue is already empty."));
       return;
     }
 
     const count = queue.clear();
     await interaction.reply(
-      `🗑️ Cleared **${count}** track${count === 1 ? "" : "s"} from the queue.`,
+      formatCommandReply("🗑️", "Queue cleared.", `Removed ${formatTrackCount(count)}.`),
     );
   },
 };

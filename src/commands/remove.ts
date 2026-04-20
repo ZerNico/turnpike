@@ -1,7 +1,12 @@
-import { MessageFlags, SlashCommandBuilder } from "discord.js";
+import { SlashCommandBuilder } from "discord.js";
 import type { Command } from "../types.ts";
 import { queueManager } from "../services/queue.ts";
-import { formatDuration } from "../utils.ts";
+import {
+  formatCommandReply,
+  formatTrackCount,
+  formatTrackSummary,
+  replyEphemeral,
+} from "../utils.ts";
 
 export const removeCmd: Command = {
   data: new SlashCommandBuilder()
@@ -17,20 +22,17 @@ export const removeCmd: Command = {
 
   async execute(interaction) {
     if (!interaction.guildId) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-        flags: MessageFlags.Ephemeral,
-      });
+      await replyEphemeral(
+        interaction,
+        formatCommandReply("⚠️", "This command can only be used in a server."),
+      );
       return;
     }
 
     const queue = queueManager.get(interaction.guildId);
 
     if (!queue || !queue.hasUpcomingTracks()) {
-      await interaction.reply({
-        content: "The queue is empty.",
-        flags: MessageFlags.Ephemeral,
-      });
+      await replyEphemeral(interaction, formatCommandReply("⚠️", "The queue is empty."));
       return;
     }
 
@@ -39,15 +41,23 @@ export const removeCmd: Command = {
 
     if (!removed) {
       const upcomingCount = queue.getUpcomingCount();
-      await interaction.reply({
-        content: `Invalid position. The queue has ${upcomingCount} track${upcomingCount === 1 ? "" : "s"}.`,
-        flags: MessageFlags.Ephemeral,
-      });
+      await replyEphemeral(
+        interaction,
+        formatCommandReply(
+          "⚠️",
+          "Invalid position.",
+          `The queue has ${formatTrackCount(upcomingCount)}.`,
+        ),
+      );
       return;
     }
 
     await interaction.reply(
-      `🗑️ Removed **${removed.title}** — ${removed.artist} (${formatDuration(removed.duration)}) from position ${position}.`,
+      formatCommandReply(
+        "🗑️",
+        "Removed track from the queue.",
+        `${formatTrackSummary(removed)}\n📋 Position: ${position}`,
+      ),
     );
   },
 };
