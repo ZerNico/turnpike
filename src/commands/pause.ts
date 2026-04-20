@@ -1,5 +1,4 @@
 import { MessageFlags, SlashCommandBuilder } from "discord.js";
-import { AudioPlayerStatus } from "@discordjs/voice";
 import type { Command } from "../types.ts";
 import { queueManager } from "../services/queue.ts";
 
@@ -25,7 +24,7 @@ export const pauseCmd: Command = {
       return;
     }
 
-    if (queue.player.state.status === AudioPlayerStatus.Paused) {
+    if (queue.isPaused()) {
       queue.resume();
       await interaction.reply(`▶️ Resumed **${queue.currentTrack.title}**`);
     } else {

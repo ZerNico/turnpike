@@ -26,6 +26,16 @@ interface ResumeState {
   paused: boolean;
 }
 
+interface GuildSettingsValues {
+  autoplay: boolean;
+  sponsorblockEnabled: boolean;
+}
+
+const DEFAULT_GUILD_SETTINGS: GuildSettingsValues = {
+  autoplay: false,
+  sponsorblockEnabled: false,
+};
+
 function buildResumeState(
   currentTrack: Track | null,
   currentPositionSeconds: number,
@@ -54,6 +64,7 @@ interface GuildQueueOptions {
   voiceChannelId: string;
   textChannelId: string;
   autoplay: boolean;
+  sponsorblockEnabled: boolean;
   tracks?: Track[];
   history?: Track[];
   currentTrack?: Track | null;
@@ -69,6 +80,7 @@ export class GuildQueue {
   history: Track[];
   currentTrack: Track | null;
   autoplay: boolean;
+  sponsorblockEnabled: boolean;
   idleTimeout: ReturnType<typeof setTimeout> | null = null;
   private resumePositionSeconds = 0;
   private playbackOffsetSeconds = 0;
@@ -83,6 +95,7 @@ export class GuildQueue {
       voiceChannelId,
       textChannelId,
       autoplay,
+      sponsorblockEnabled,
       tracks = [],
       history = [],
       currentTrack = null,
@@ -94,6 +107,7 @@ export class GuildQueue {
     this.voiceChannelId = voiceChannelId;
     this.textChannelId = textChannelId;
     this.autoplay = autoplay;
+    this.sponsorblockEnabled = sponsorblockEnabled;
     this.tracks = tracks;
     this.history = history;
     this.currentTrack = currentTrack;
@@ -137,7 +151,7 @@ export class GuildQueue {
       this.startPaused = false;
 
       try {
-        const resource = createTrackResource(next, startSeconds);
+        const resource = createTrackResource(next, startSeconds, this.sponsorblockEnabled);
         this.player.play(resource);
         if (startPaused) this.player.pause();
         this.persist();
@@ -243,7 +257,7 @@ export class GuildQueue {
     this.clearIdleTimeout();
 
     try {
-      const resource = createTrackResource(prev);
+      const resource = createTrackResource(prev, 0, this.sponsorblockEnabled);
       this.player.play(resource);
       this.persist();
       return prev;
@@ -265,13 +279,20 @@ export class GuildQueue {
     return count;
   }
 
-  setAutoplay(value: boolean): void {
-    this.autoplay = value;
+  hasUpcomingTracks(): boolean {
+    return this.tracks.length > 0;
+  }
 
-    db.insert(guildSettings)
-      .values({ guildId: this.guildId, autoplay: value })
-      .onConflictDoUpdate({ target: guildSettings.guildId, set: { autoplay: value } })
-      .run();
+  getUpcomingCount(): number {
+    return this.tracks.length;
+  }
+
+  setAutoplay(value: boolean): void {
+    this.manager.setAutoplay(this.guildId, value);
+  }
+
+  setSponsorblockEnabled(value: boolean): void {
+    this.manager.setSponsorblockEnabled(this.guildId, value);
   }
 
   getInfo(): QueueInfo {
@@ -305,6 +326,16 @@ export class GuildQueue {
     this.startPaused = resume?.paused ?? false;
   }
 
+  applyGuildSettings(settings: Partial<GuildSettingsValues>): void {
+    if (settings.autoplay !== undefined) {
+      this.autoplay = settings.autoplay;
+    }
+
+    if (settings.sponsorblockEnabled !== undefined) {
+      this.sponsorblockEnabled = settings.sponsorblockEnabled;
+    }
+  }
+
   private persist(): void {
     this.manager.persistQueue(this);
   }
@@ -336,7 +367,9 @@ export class GuildQueue {
   }
 
   private isActive(): boolean {
-    return this.manager.get(this.guildId) === this && !this.currentTrack && this.tracks.length === 0;
+    return (
+      this.manager.get(this.guildId) === this && !this.currentTrack && this.tracks.length === 0
+    );
   }
 
   private handleAutoplay(): void {
@@ -400,15 +433,43 @@ export class QueueManager {
     return this.queues.get(guildId);
   }
 
+  getGuildSettings(guildId: string): GuildSettingsValues {
+    const stored = this.readStoredGuildSettings(guildId);
+    const queue = this.queues.get(guildId);
+
+    if (!queue) return stored;
+
+    return {
+      autoplay: queue.autoplay,
+      sponsorblockEnabled: queue.sponsorblockEnabled,
+    };
+  }
+
+  setAutoplay(guildId: string, value: boolean): void {
+    this.updateGuildSettings(guildId, { autoplay: value });
+  }
+
+  toggleAutoplay(guildId: string): boolean {
+    const value = !this.getGuildSettings(guildId).autoplay;
+    this.setAutoplay(guildId, value);
+    return value;
+  }
+
+  setSponsorblockEnabled(guildId: string, value: boolean): void {
+    this.updateGuildSettings(guildId, { sponsorblockEnabled: value });
+  }
+
+  toggleSponsorblockEnabled(guildId: string): boolean {
+    const value = !this.getGuildSettings(guildId).sponsorblockEnabled;
+    this.setSponsorblockEnabled(guildId, value);
+    return value;
+  }
+
   getOrCreate(guildId: string, voiceChannel: VoiceBasedChannel, textChannelId: string): GuildQueue {
     const existing = this.queues.get(guildId);
     if (existing) return existing;
 
-    const settings = db
-      .select()
-      .from(guildSettings)
-      .where(eq(guildSettings.guildId, guildId))
-      .get();
+    const settings = this.readStoredGuildSettings(guildId);
 
     const { connection, player } = joinChannel(voiceChannel, () => {
       this.queues.get(guildId)?.handleExternalDestroyed();
@@ -420,7 +481,8 @@ export class QueueManager {
       connection,
       voiceChannelId: voiceChannel.id,
       textChannelId,
-      autoplay: settings?.autoplay ?? false,
+      autoplay: settings.autoplay,
+      sponsorblockEnabled: settings.sponsorblockEnabled,
     });
 
     this.queues.set(guildId, queue);
@@ -440,7 +502,11 @@ export class QueueManager {
         await client.guilds.fetch(row.guildId);
         const channel = await client.channels.fetch(row.voiceChannelId);
 
-        if (!channel?.isVoiceBased() || !("guildId" in channel) || channel.guildId !== row.guildId) {
+        if (
+          !channel?.isVoiceBased() ||
+          !("guildId" in channel) ||
+          channel.guildId !== row.guildId
+        ) {
           this.deletePersistedQueue(row.guildId);
           continue;
         }
@@ -497,6 +563,35 @@ export class QueueManager {
 
   deletePersistedQueue(guildId: string): void {
     db.delete(guildQueues).where(eq(guildQueues.guildId, guildId)).run();
+  }
+
+  private readStoredGuildSettings(guildId: string): GuildSettingsValues {
+    const settings = db
+      .select()
+      .from(guildSettings)
+      .where(eq(guildSettings.guildId, guildId))
+      .get();
+
+    return {
+      autoplay: settings?.autoplay ?? DEFAULT_GUILD_SETTINGS.autoplay,
+      sponsorblockEnabled:
+        settings?.sponsorblockEnabled ?? DEFAULT_GUILD_SETTINGS.sponsorblockEnabled,
+    };
+  }
+
+  private updateGuildSettings(guildId: string, patch: Partial<GuildSettingsValues>): void {
+    const queue = this.queues.get(guildId);
+    queue?.applyGuildSettings(patch);
+
+    const next = { ...this.readStoredGuildSettings(guildId), ...patch };
+
+    db.insert(guildSettings)
+      .values({ guildId, ...next })
+      .onConflictDoUpdate({
+        target: guildSettings.guildId,
+        set: next,
+      })
+      .run();
   }
 }
 

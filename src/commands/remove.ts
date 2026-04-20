@@ -26,7 +26,7 @@ export const removeCmd: Command = {
 
     const queue = queueManager.get(interaction.guildId);
 
-    if (!queue || queue.tracks.length === 0) {
+    if (!queue || !queue.hasUpcomingTracks()) {
       await interaction.reply({
         content: "The queue is empty.",
         flags: MessageFlags.Ephemeral,
@@ -38,8 +38,9 @@ export const removeCmd: Command = {
     const removed = queue.remove(position);
 
     if (!removed) {
+      const upcomingCount = queue.getUpcomingCount();
       await interaction.reply({
-        content: `Invalid position. The queue has ${queue.tracks.length} track${queue.tracks.length === 1 ? "" : "s"}.`,
+        content: `Invalid position. The queue has ${upcomingCount} track${upcomingCount === 1 ? "" : "s"}.`,
         flags: MessageFlags.Ephemeral,
       });
       return;

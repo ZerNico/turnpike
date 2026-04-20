@@ -18,7 +18,7 @@ export const shuffleCmd: Command = {
 
     const queue = queueManager.get(interaction.guildId);
 
-    if (!queue || queue.tracks.length === 0) {
+    if (!queue || !queue.hasUpcomingTracks()) {
       await interaction.reply({
         content: "There are no upcoming tracks to shuffle.",
         flags: MessageFlags.Ephemeral,

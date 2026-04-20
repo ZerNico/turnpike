@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "ad907db4-2eb2-4a3b-9308-a4013e213298",
-  "prevId": "dc8c01ae-df57-42f6-be14-3ca9e594c03d",
+  "id": "c2dce0f8-7a1a-4ef4-a6f1-c1c8b824fd35",
+  "prevId": "ad907db4-2eb2-4a3b-9308-a4013e213298",
   "tables": {
     "guild_queues": {
       "name": "guild_queues",
@@ -42,6 +42,14 @@
           "notNull": true,
           "autoincrement": false,
           "default": 0
+        },
+        "paused": {
+          "name": "paused",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         },
         "tracks": {
           "name": "tracks",

@@ -26,8 +26,7 @@ export const autoplayCmd: Command = {
       return;
     }
 
-    const newValue = !queue.autoplay;
-    queue.setAutoplay(newValue);
+    const newValue = queueManager.toggleAutoplay(interaction.guildId);
 
     if (newValue) {
       await interaction.reply(

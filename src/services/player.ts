@@ -4,7 +4,7 @@ import type { Track } from "../types.ts";
 import { config } from "../config.ts";
 
 // yt-dlp → ffmpeg (loudnorm) → AudioResource
-export function createTrackResource(track: Track, startSeconds = 0) {
+export function createTrackResource(track: Track, startSeconds = 0, sponsorblockEnabled = false) {
   const ytdlpArgs = [
     "--no-warnings",
     "--no-playlist",
@@ -16,6 +16,10 @@ export function createTrackResource(track: Track, startSeconds = 0) {
 
   if (config.ytdlpCookiesFile) {
     ytdlpArgs.push("--cookies", config.ytdlpCookiesFile);
+  }
+
+  if (sponsorblockEnabled) {
+    ytdlpArgs.push("--sponsorblock-remove", "default");
   }
 
   ytdlpArgs.push(track.youtubeUrl);

@@ -15,6 +15,20 @@
       "when": 1776618869309,
       "tag": "0001_mixed_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1777051200000,
+      "tag": "0002_hushed_pause",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1777051260000,
+      "tag": "0003_mellow_rhythm",
+      "breakpoints": true
     }
   ]
 }

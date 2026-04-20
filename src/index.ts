@@ -21,6 +21,7 @@ import { removeCmd } from "./commands/remove.ts";
 import { unskipCmd } from "./commands/unskip.ts";
 import { clearCmd } from "./commands/clear.ts";
 import { autoplayCmd } from "./commands/autoplay.ts";
+import { sponsorblockCmd } from "./commands/sponsorblock.ts";
 
 process.on("unhandledRejection", (error) => {
   console.error("[Unhandled Rejection]", error);
@@ -37,6 +38,7 @@ commands.set(removeCmd.data.name, removeCmd);
 commands.set(unskipCmd.data.name, unskipCmd);
 commands.set(clearCmd.data.name, clearCmd);
 commands.set(autoplayCmd.data.name, autoplayCmd);
+commands.set(sponsorblockCmd.data.name, sponsorblockCmd);
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
@@ -110,8 +112,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         } else {
           await interaction.reply(reply);
         }
-      } catch {
-      }
+      } catch {}
     }
 
     return;
