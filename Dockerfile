@@ -22,14 +22,24 @@ RUN bun build --compile --minify \
 # Stage 3: Minimal production image
 FROM alpine:3.23
 
-RUN apk add --no-cache yt-dlp ffmpeg
+RUN apk add --no-cache ffmpeg python3 ca-certificates wget
 
 RUN addgroup -S app && adduser -S app -G app
 
 WORKDIR /app
 COPY --from=build /app/app ./app
-RUN mkdir -p /app/data && chown app:app /app/data
+
+RUN mkdir -p /app/bin /app/data \
+    && wget -qO /app/bin/yt-dlp https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \
+    && chmod +x /app/bin/yt-dlp \
+    && chown -R app:app /app/bin /app/data
+
+ENV PATH="/app/bin:${PATH}"
+
+COPY --chown=app:app docker/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 USER app
 
+ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["./app"]
