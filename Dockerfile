@@ -28,13 +28,16 @@ RUN addgroup -S app && adduser -S app -G app
 
 WORKDIR /app
 COPY --from=build /app/app ./app
+COPY --chown=app:app drizzle/ /app/drizzle/
 
 RUN mkdir -p /app/bin /app/data \
     && wget -qO /app/bin/yt-dlp https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \
     && chmod +x /app/bin/yt-dlp \
-    && chown -R app:app /app/bin /app/data
+    && chown -R app:app /app/bin /app/data /app/drizzle
 
 ENV PATH="/app/bin:${PATH}"
+ENV DATABASE_PATH="/app/data/turnpike.db"
+ENV DRIZZLE_MIGRATIONS="/app/drizzle"
 
 COPY --chown=app:app docker/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
