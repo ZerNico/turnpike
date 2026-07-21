@@ -44,6 +44,21 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
 });
 
+const rest = new REST().setToken(config.token);
+const commandData = commands.map((cmd) => cmd.data.toJSON());
+
+async function syncGuildCommands(applicationId: string, guildId: string, guildName: string) {
+  try {
+    await rest.put(Routes.applicationGuildCommands(applicationId, guildId), {
+      body: commandData,
+    });
+    return true;
+  } catch {
+    console.warn(`⚠️ Could not sync commands to guild ${guildName}`);
+    return false;
+  }
+}
+
 client.once(Events.ClientReady, async (readyClient) => {
   console.log(`✅ Logged in as ${readyClient.user.tag}`);
   console.log(`📡 Serving ${readyClient.guilds.cache.size} guild(s)`);
@@ -51,24 +66,17 @@ client.once(Events.ClientReady, async (readyClient) => {
     `🔗 Invite: https://discord.com/oauth2/authorize?client_id=${readyClient.application.id}&permissions=3145728&scope=bot%20applications.commands`,
   );
 
-  const rest = new REST().setToken(config.token);
-  const commandData = commands.map((cmd) => cmd.data.toJSON());
-
   try {
     console.log(`🔄 Syncing ${commandData.length} slash commands...`);
 
     await rest.put(Routes.applicationCommands(readyClient.application.id), { body: [] });
 
     // guild commands update instantly, unlike global commands
-    for (const guild of readyClient.guilds.cache.values()) {
-      try {
-        await rest.put(Routes.applicationGuildCommands(readyClient.application.id, guild.id), {
-          body: commandData,
-        });
-      } catch {
-        console.warn(`⚠️ Could not sync commands to guild ${guild.name}`);
-      }
-    }
+    await Promise.all(
+      readyClient.guilds.cache.map((guild) =>
+        syncGuildCommands(readyClient.application.id, guild.id, guild.name),
+      ),
+    );
 
     console.log(
       `✅ Synced ${commandData.length} slash commands to ${readyClient.guilds.cache.size} guild(s).`,
@@ -84,6 +92,18 @@ client.once(Events.ClientReady, async (readyClient) => {
     }
   } catch (error) {
     console.error("Failed to restore sessions:", error);
+  }
+});
+
+// Register commands when the bot is added to a new guild while running
+client.on(Events.GuildCreate, async (guild) => {
+  const applicationId = guild.client.application?.id;
+  if (!applicationId) return;
+
+  console.log(`➕ Joined guild ${guild.name} — syncing slash commands...`);
+  const ok = await syncGuildCommands(applicationId, guild.id, guild.name);
+  if (ok) {
+    console.log(`✅ Synced ${commandData.length} slash commands to ${guild.name}.`);
   }
 });
 
