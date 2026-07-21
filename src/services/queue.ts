@@ -12,6 +12,7 @@ import { createTrackResource } from "./player.ts";
 import { joinChannel, leaveChannel } from "./voice.ts";
 
 const IDLE_TIMEOUT_MS = 2 * 60 * 1000;
+const EMPTY_CHANNEL_TIMEOUT_MS = 60 * 1000;
 const POSITION_CHECKPOINT_MS = 10 * 1000;
 const RESUME_END_BUFFER_SECONDS = 5;
 
@@ -82,6 +83,7 @@ export class GuildQueue {
   autoplay: boolean;
   sponsorblockEnabled: boolean;
   idleTimeout: ReturnType<typeof setTimeout> | null = null;
+  private emptyChannelTimeout: ReturnType<typeof setTimeout> | null = null;
   private resumePositionSeconds = 0;
   private playbackOffsetSeconds = 0;
   private startPaused = false;
@@ -279,6 +281,25 @@ export class GuildQueue {
     return count;
   }
 
+  /**
+   * React to a change in the number of (human) listeners in the bot's voice
+   * channel. When everyone leaves, start a grace-period timer that disconnects
+   * the bot; if someone (re)joins before it fires, cancel the timer.
+   */
+  handleListenerCountChange(humanListeners: number): void {
+    if (humanListeners > 0) {
+      this.clearEmptyChannelTimeout();
+      return;
+    }
+
+    if (this.emptyChannelTimeout) return;
+
+    this.emptyChannelTimeout = setTimeout(() => {
+      this.emptyChannelTimeout = null;
+      this.destroy();
+    }, EMPTY_CHANNEL_TIMEOUT_MS);
+  }
+
   hasUpcomingTracks(): boolean {
     return this.tracks.length > 0;
   }
@@ -342,6 +363,7 @@ export class GuildQueue {
 
   private reset(): void {
     this.clearIdleTimeout();
+    this.clearEmptyChannelTimeout();
     this.tracks = [];
     this.history = [];
     this.clearCurrent();
@@ -358,6 +380,13 @@ export class GuildQueue {
     if (this.idleTimeout) {
       clearTimeout(this.idleTimeout);
       this.idleTimeout = null;
+    }
+  }
+
+  private clearEmptyChannelTimeout(): void {
+    if (this.emptyChannelTimeout) {
+      clearTimeout(this.emptyChannelTimeout);
+      this.emptyChannelTimeout = null;
     }
   }
 
@@ -486,6 +515,11 @@ export class QueueManager {
     });
 
     this.queues.set(guildId, queue);
+
+    // Handle (re)joining an already-empty channel, e.g. after a restart
+    const humanListeners = voiceChannel.members.filter((member) => !member.user.bot).size;
+    queue.handleListenerCountChange(humanListeners);
+
     return queue;
   }
 

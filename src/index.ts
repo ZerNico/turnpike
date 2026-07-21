@@ -107,6 +107,23 @@ client.on(Events.GuildCreate, async (guild) => {
   }
 });
 
+// Disconnect the bot shortly after the last listener leaves its voice channel
+client.on(Events.VoiceStateUpdate, (oldState, newState) => {
+  const guildId = newState.guild.id;
+  const queue = queueManager.get(guildId);
+  if (!queue) return;
+
+  // Only react when the change touches the channel the bot is in
+  const botChannelId = queue.voiceChannelId;
+  if (oldState.channelId !== botChannelId && newState.channelId !== botChannelId) return;
+
+  const channel = newState.guild.channels.cache.get(botChannelId);
+  if (!channel?.isVoiceBased()) return;
+
+  const humanListeners = channel.members.filter((member) => !member.user.bot).size;
+  queue.handleListenerCountChange(humanListeners);
+});
+
 client.on(Events.InteractionCreate, async (interaction) => {
   if (interaction.isChatInputCommand()) {
     const command = commands.get(interaction.commandName);
