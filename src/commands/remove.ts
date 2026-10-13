@@ -7,6 +7,7 @@ import {
   formatTrackSummary,
   replyEphemeral,
   ensureInBotChannel,
+  autocompleteQueuePosition,
 } from "../utils.ts";
 
 export const removeCmd: Command = {
@@ -18,8 +19,13 @@ export const removeCmd: Command = {
         .setName("position")
         .setDescription("Position of the track to remove (use /queue to see positions)")
         .setRequired(true)
-        .setMinValue(1),
+        .setMinValue(1)
+        .setAutocomplete(true),
     ),
+
+  async autocomplete(interaction) {
+    await autocompleteQueuePosition(interaction, queueManager);
+  },
 
   async execute(interaction) {
     if (!interaction.guildId) {

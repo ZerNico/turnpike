@@ -3,7 +3,7 @@ import type { AudioPlayer, AudioResource, VoiceConnection } from "@discordjs/voi
 import type { Client, VoiceBasedChannel } from "discord.js";
 import { DiscordAPIError } from "discord.js";
 import { eq } from "drizzle-orm";
-import type { Track } from "../types.ts";
+import type { LoopMode, Track } from "../types.ts";
 import { db } from "../db/index.ts";
 import { guildQueues, guildSettings } from "../db/schema.ts";
 import { registry } from "../providers/registry.ts";
@@ -57,6 +57,8 @@ export interface QueueInfo {
   playbackSeconds: number;
   upcoming: Track[];
   size: number;
+  paused: boolean;
+  loopMode: LoopMode;
 }
 
 interface GuildQueueOptions {
@@ -83,6 +85,7 @@ export class GuildQueue {
   currentTrack: Track | null;
   autoplay: boolean;
   sponsorblockEnabled: boolean;
+  loopMode: LoopMode = "off";
   idleTimeout: ReturnType<typeof setTimeout> | null = null;
   private emptyChannelTimeout: ReturnType<typeof setTimeout> | null = null;
   private resumePositionSeconds = 0;
@@ -121,7 +124,7 @@ export class GuildQueue {
 
     this.player.on(AudioPlayerStatus.Idle, () => {
       if (this.destroyed) return;
-      this.playNext();
+      this.handleTrackEnd();
     });
 
     this.player.on(AudioPlayerStatus.Playing, (_oldState, newState) => {
@@ -203,6 +206,10 @@ export class GuildQueue {
     const toDrop = Math.min(count - 1, this.tracks.length);
     if (toDrop > 0) {
       skipped.push(...this.tracks.splice(0, toDrop));
+    }
+
+    if (this.loopMode === "queue") {
+      this.tracks.push(...skipped);
     }
 
     const next = this.tracks[0] ?? null;
@@ -319,6 +326,45 @@ export class GuildQueue {
     }
   }
 
+  /** Restart the current track at the given position, keeping it paused if it was. */
+  seek(seconds: number): boolean {
+    const track = this.currentTrack;
+    if (!track) return false;
+
+    const wasPaused = this.isPaused();
+    const position = Math.max(0, Math.min(Math.floor(seconds), Math.max(track.duration - 1, 0)));
+
+    try {
+      const resource = createTrackResource(track, position, this.sponsorblockEnabled);
+      this.player.play(resource);
+      this.playbackOffsetSeconds = position;
+      this.pendingPauseResource = wasPaused ? resource : null;
+      this.persist();
+      return true;
+    } catch (error) {
+      console.error(`[Queue ${this.guildId}] Failed to seek "${track.title}":`, error);
+      return false;
+    }
+  }
+
+  /** Move an upcoming track between two 1-based positions. */
+  move(from: number, to: number): Track | null {
+    const fromIndex = from - 1;
+    const toIndex = to - 1;
+    if (fromIndex < 0 || fromIndex >= this.tracks.length) return null;
+    if (toIndex < 0 || toIndex >= this.tracks.length) return null;
+
+    const [track] = this.tracks.splice(fromIndex, 1);
+    this.tracks.splice(toIndex, 0, track!);
+    this.persist();
+    return track ?? null;
+  }
+
+  setLoopMode(mode: LoopMode): void {
+    this.loopMode = mode;
+    this.persist();
+  }
+
   clear(): number {
     const count = this.tracks.length;
     this.tracks = [];
@@ -374,6 +420,8 @@ export class GuildQueue {
       playbackSeconds: this.getCurrentPlaybackSeconds(),
       upcoming: [...this.tracks],
       size: this.tracks.length,
+      paused: this.isPaused(),
+      loopMode: this.loopMode,
     };
   }
 
@@ -401,7 +449,13 @@ export class GuildQueue {
     );
   }
 
-  restoreState(tracks: Track[], history: Track[], resume: ResumeState | null): void {
+  restoreState(
+    tracks: Track[],
+    history: Track[],
+    resume: ResumeState | null,
+    loopMode: LoopMode = "off",
+  ): void {
+    this.loopMode = loopMode;
     this.currentTrack = null;
     this.tracks = resume ? [resume.track, ...tracks] : tracks;
     this.history = history;
@@ -418,6 +472,29 @@ export class GuildQueue {
     if (settings.sponsorblockEnabled !== undefined) {
       this.sponsorblockEnabled = settings.sponsorblockEnabled;
     }
+  }
+
+  /** A track finished on its own (as opposed to being skipped or failing). */
+  private handleTrackEnd(): void {
+    const finished = this.currentTrack;
+
+    if (finished && this.loopMode === "track") {
+      try {
+        const resource = createTrackResource(finished, 0, this.sponsorblockEnabled);
+        this.player.play(resource);
+        this.playbackOffsetSeconds = 0;
+        this.persist();
+        return;
+      } catch (error) {
+        console.error(`[Queue ${this.guildId}] Failed to loop "${finished.title}":`, error);
+      }
+    }
+
+    if (finished && this.loopMode === "queue") {
+      this.tracks.push(finished);
+    }
+
+    this.playNext();
   }
 
   private persist(): void {
@@ -652,11 +729,11 @@ export class QueueManager {
         const queue = this.getOrCreate(row.guildId, channel, row.textChannelId);
 
         if (resume) {
-          queue.restoreState(tracks, history, resume);
+          queue.restoreState(tracks, history, resume, row.loopMode);
         } else if (row.currentTrack) {
-          queue.restoreState(tracks, [...history, row.currentTrack], null);
+          queue.restoreState(tracks, [...history, row.currentTrack], null, row.loopMode);
         } else {
-          queue.restoreState(tracks, history, null);
+          queue.restoreState(tracks, history, null, row.loopMode);
         }
 
         queue.playNext();
@@ -682,6 +759,7 @@ export class QueueManager {
       paused: queue.isPaused(),
       tracks: queue.tracks,
       history: queue.history,
+      loopMode: queue.loopMode,
     };
 
     db.insert(guildQueues)

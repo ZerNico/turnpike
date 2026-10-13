@@ -22,6 +22,14 @@ import { unskipCmd } from "./commands/unskip.ts";
 import { clearCmd } from "./commands/clear.ts";
 import { autoplayCmd } from "./commands/autoplay.ts";
 import { sponsorblockCmd } from "./commands/sponsorblock.ts";
+import { seekCmd } from "./commands/seek.ts";
+import { loopCmd } from "./commands/loop.ts";
+import { moveCmd } from "./commands/move.ts";
+import {
+  NOW_PLAYING_BUTTON_PREFIX,
+  handleNowPlayingButton,
+  nowPlayingCmd,
+} from "./commands/nowplaying.ts";
 
 process.on("unhandledRejection", (error) => {
   console.error("[Unhandled Rejection]", error);
@@ -39,6 +47,10 @@ commands.set(unskipCmd.data.name, unskipCmd);
 commands.set(clearCmd.data.name, clearCmd);
 commands.set(autoplayCmd.data.name, autoplayCmd);
 commands.set(sponsorblockCmd.data.name, sponsorblockCmd);
+commands.set(seekCmd.data.name, seekCmd);
+commands.set(loopCmd.data.name, loopCmd);
+commands.set(moveCmd.data.name, moveCmd);
+commands.set(nowPlayingCmd.data.name, nowPlayingCmd);
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
@@ -155,6 +167,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
           await interaction.reply(reply);
         }
       } catch {}
+    }
+
+    return;
+  }
+
+  if (interaction.isButton() && interaction.customId.startsWith(NOW_PLAYING_BUTTON_PREFIX)) {
+    try {
+      await handleNowPlayingButton(interaction);
+    } catch (error) {
+      console.error(`[Button ${interaction.customId}] Error:`, error);
     }
 
     return;

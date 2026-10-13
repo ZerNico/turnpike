@@ -1,0 +1,1 @@
+ALTER TABLE `guild_queues` ADD `loop_mode` text DEFAULT 'off' NOT NULL;

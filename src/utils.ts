@@ -2,12 +2,31 @@ import type { Track } from "./types.ts";
 import type { SearchResult, SearchProvider } from "./providers/base.ts";
 import type { GuildQueue } from "./services/queue.ts";
 import { GuildMember, MessageFlags } from "discord.js";
-import type { ChatInputCommandInteraction } from "discord.js";
+import type {
+  AutocompleteInteraction,
+  ChatInputCommandInteraction,
+  RepliableInteraction,
+} from "discord.js";
+import type { QueueManager } from "./services/queue.ts";
 
 export function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+/** Parses "90", "1:30" or "1:02:03" into seconds; null if invalid. */
+export function parseTimestamp(input: string): number | null {
+  const parts = input.trim().split(":");
+  if (parts.length > 3 || parts.some((part) => !/^\d+$/.test(part))) return null;
+
+  return parts.reduce((total, part) => total * 60 + Number(part), 0);
+}
+
+export function progressBar(current: number, total: number, length = 14): string {
+  const filled = total > 0 ? Math.min(Math.round((current / total) * length), length) : 0;
+  const empty = length - filled;
+  return `${formatDuration(current)} ▓${"█".repeat(filled)}${"░".repeat(empty)}▓ ${formatDuration(total)}`;
 }
 
 export function formatTrackSummary(track: Track): string {
@@ -23,7 +42,7 @@ export function formatCommandReply(emoji: string, summary: string, detail?: stri
 }
 
 export async function replyEphemeral(
-  interaction: ChatInputCommandInteraction,
+  interaction: RepliableInteraction,
   content: string,
 ): Promise<void> {
   await interaction.reply({
@@ -37,7 +56,7 @@ export async function replyEphemeral(
  * ephemeral error and returns false otherwise.
  */
 export async function ensureInBotChannel(
-  interaction: ChatInputCommandInteraction,
+  interaction: RepliableInteraction,
   queue: GuildQueue,
 ): Promise<boolean> {
   const member = interaction.member;
@@ -49,6 +68,37 @@ export async function ensureInBotChannel(
     formatCommandReply("⚠️", "Join my voice channel first.", `I'm in <#${queue.voiceChannelId}>.`),
   );
   return false;
+}
+
+const MAX_AUTOCOMPLETE_CHOICES = 25;
+
+/**
+ * Suggests upcoming queue positions for an integer option, matching what was
+ * typed against either the position or the track's title and artist.
+ */
+export async function autocompleteQueuePosition(
+  interaction: AutocompleteInteraction,
+  manager: QueueManager,
+): Promise<void> {
+  const queue = interaction.guildId ? manager.get(interaction.guildId) : undefined;
+  const typed = String(interaction.options.getFocused()).trim().toLowerCase();
+
+  const choices = (queue?.tracks ?? [])
+    .map((track, i) => ({ track, position: i + 1 }))
+    .filter(
+      ({ track, position }) =>
+        !typed ||
+        String(position).startsWith(typed) ||
+        track.title.toLowerCase().includes(typed) ||
+        track.artist.toLowerCase().includes(typed),
+    )
+    .slice(0, MAX_AUTOCOMPLETE_CHOICES)
+    .map(({ track, position }) => ({
+      name: `${position}. ${track.title} — ${track.artist}`.slice(0, 100),
+      value: position,
+    }));
+
+  await interaction.respond(choices);
 }
 
 export async function replyWithTrackStatus(

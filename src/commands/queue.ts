@@ -1,13 +1,7 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import type { Command, Track } from "../types.ts";
 import { queueManager } from "../services/queue.ts";
-import { formatCommandReply, formatDuration, replyEphemeral } from "../utils.ts";
-
-function progressBar(current: number, total: number, length = 14): string {
-  const filled = total > 0 ? Math.round((current / total) * length) : 0;
-  const empty = length - filled;
-  return `${formatDuration(current)} ▓${"█".repeat(filled)}${"░".repeat(empty)}▓ ${formatDuration(total)}`;
-}
+import { formatCommandReply, formatDuration, progressBar, replyEphemeral } from "../utils.ts";
 
 function trackLine(index: number, track: Track): string {
   return `**${index}.** [${track.title}](${track.url}) — ${track.artist} (${formatDuration(track.duration)})`;

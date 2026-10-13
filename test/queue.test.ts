@@ -152,6 +152,127 @@ describe("playback", () => {
   });
 });
 
+describe("loop", () => {
+  test("track loop replays the track when it finishes, but skip moves on", () => {
+    const { queue, player } = createQueue();
+    queue.enqueue(makeTrack(1));
+    queue.enqueue(makeTrack(2));
+    queue.setLoopMode("track");
+    player.startPlaying();
+    player.advance(170);
+
+    player.stop();
+
+    expect(queue.currentTrack?.title).toBe("Track 1");
+    expect(player.resource?.startSeconds).toBe(0);
+    expect(queue.getCurrentPlaybackSeconds()).toBe(0);
+    expect(queue.history).toHaveLength(0);
+
+    player.startPlaying();
+    queue.skip();
+
+    expect(queue.currentTrack?.title).toBe("Track 2");
+  });
+
+  test("queue loop sends finished and skipped tracks to the back", () => {
+    const { queue, player } = createQueue();
+    for (let i = 1; i <= 3; i++) queue.enqueue(makeTrack(i));
+    queue.setLoopMode("queue");
+    player.startPlaying();
+
+    player.stop();
+    expect(queue.currentTrack?.title).toBe("Track 2");
+    expect(queue.tracks.map((t) => t.title)).toEqual(["Track 3", "Track 1"]);
+
+    player.startPlaying();
+    const { next } = queue.skip();
+    expect(next?.title).toBe("Track 3");
+    expect(queue.tracks.map((t) => t.title)).toEqual(["Track 1", "Track 2"]);
+  });
+
+  test("queue loop keeps a single track playing", () => {
+    const { queue, player } = createQueue();
+    queue.enqueue(makeTrack(1));
+    queue.setLoopMode("queue");
+    player.startPlaying();
+
+    player.stop();
+
+    expect(queue.currentTrack?.title).toBe("Track 1");
+    expect(queue.idleTimeout).toBeNull();
+  });
+
+  test("loop mode is persisted", () => {
+    const { queue } = createQueue();
+    queue.enqueue(makeTrack(1));
+    queue.setLoopMode("queue");
+
+    expect(persistedRow()?.loopMode).toBe("queue");
+  });
+});
+
+describe("seek", () => {
+  test("restarts the track at the requested position", () => {
+    const { queue, player } = createQueue();
+    queue.enqueue(makeTrack(1));
+    player.startPlaying();
+    player.advance(10);
+
+    expect(queue.seek(95)).toBe(true);
+
+    expect(player.resource?.startSeconds).toBe(95);
+    expect(queue.getCurrentPlaybackSeconds()).toBe(95);
+    player.startPlaying();
+    player.advance(5);
+    expect(queue.getCurrentPlaybackSeconds()).toBe(100);
+    expect(persistedRow()?.currentPositionSeconds).toBe(95);
+  });
+
+  test("stays paused when seeking while paused", () => {
+    const { queue, player } = createQueue();
+    queue.enqueue(makeTrack(1));
+    player.startPlaying();
+    queue.pause();
+
+    queue.seek(30);
+    player.startPlaying();
+
+    expect(player.state.status).toBe(AudioPlayerStatus.Paused);
+    expect(queue.getCurrentPlaybackSeconds()).toBe(30);
+  });
+
+  test("clamps to the track length and fails with nothing playing", () => {
+    const { queue, player } = createQueue();
+    expect(queue.seek(10)).toBe(false);
+
+    queue.enqueue(makeTrack(1, 120));
+    queue.seek(500);
+
+    expect(player.resource?.startSeconds).toBe(119);
+  });
+});
+
+describe("move", () => {
+  test("moves a track between positions", () => {
+    const { queue } = createQueue();
+    for (let i = 1; i <= 5; i++) queue.enqueue(makeTrack(i));
+
+    const moved = queue.move(4, 1);
+
+    expect(moved?.title).toBe("Track 5");
+    expect(queue.tracks.map((t) => t.title)).toEqual(["Track 5", "Track 2", "Track 3", "Track 4"]);
+  });
+
+  test("rejects positions outside the queue", () => {
+    const { queue } = createQueue();
+    for (let i = 1; i <= 3; i++) queue.enqueue(makeTrack(i));
+
+    expect(queue.move(0, 1)).toBeNull();
+    expect(queue.move(1, 3)).toBeNull();
+    expect(queue.tracks.map((t) => t.title)).toEqual(["Track 2", "Track 3"]);
+  });
+});
+
 describe("pausing", () => {
   test("a pause requested while buffering applies once playback starts", () => {
     const { queue, player } = createQueue();
@@ -295,6 +416,7 @@ describe("restore", () => {
       currentPositionSeconds: 60,
       paused: true,
       tracks: [makeTrack(2)],
+      loopMode: "track",
     });
 
     // oxlint-disable-next-line typescript/no-explicit-any -- structural fake
@@ -306,6 +428,7 @@ describe("restore", () => {
     expect(queue.currentTrack?.title).toBe("Track 1");
     expect(player.resource?.startSeconds).toBe(60);
     expect(queue.isPaused()).toBe(true);
+    expect(queue.loopMode).toBe("track");
 
     player.startPlaying();
     expect(player.state.status).toBe(AudioPlayerStatus.Paused);

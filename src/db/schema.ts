@@ -25,4 +25,7 @@ export const guildQueues = sqliteTable("guild_queues", {
     .$type<Track[]>()
     .notNull()
     .default(sql`'[]'`),
+  loopMode: text("loop_mode", { enum: ["off", "track", "queue"] })
+    .notNull()
+    .default("off"),
 });

@@ -64,16 +64,20 @@ Slash commands are automatically registered with Discord on startup.
 | `/unskip`                | Replay the previously played track                             |
 | `/stop`                  | Stop playback, clear queue, and disconnect                     |
 | `/queue [page]`          | Show the queue with progress bar and pagination                |
+| `/nowplaying`            | Show the current track with pause/skip/loop/stop buttons       |
 | `/pause`                 | Toggle pause/resume                                            |
+| `/seek <position>`       | Jump to a position in the current track (e.g. `1:30`)          |
+| `/loop [mode]`           | Loop the track or the queue; omit to cycle off/track/queue     |
 | `/shuffle`               | Shuffle upcoming tracks in the queue                           |
 | `/remove <pos>`          | Remove a track from the queue by position                      |
+| `/move <from> <to>`      | Move a track to a different position in the queue              |
 | `/clear`                 | Clear all upcoming tracks but keep the current one playing     |
 | `/autoplay [on/off]`     | Toggle autoplay (queue related tracks when the queue runs out) |
 | `/sponsorblock [on/off]` | Toggle SponsorBlock skipping for newly started YouTube tracks  |
 
 ### Session persistence
 
-Queues, playback position, pause state, and per-guild settings such as autoplay and SponsorBlock are stored in a local SQLite database (`./data/turnpike.db` by default). When the bot restarts, it rejoins the previous voice channel and resumes the current track roughly where it left off.
+Queues, playback position, pause state, loop mode, and per-guild settings such as autoplay and SponsorBlock are stored in a local SQLite database (`./data/turnpike.db` by default). When the bot restarts, it rejoins the previous voice channel and resumes the current track roughly where it left off.
 
 ### Supported links
 

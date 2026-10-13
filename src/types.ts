@@ -16,6 +16,8 @@ export interface Track {
   requestedBy: string;
 }
 
+export type LoopMode = "off" | "track" | "queue";
+
 export interface Command {
   data: SlashCommandBuilder | SlashCommandOptionsOnlyBuilder;
   execute(interaction: ChatInputCommandInteraction): Promise<void>;
