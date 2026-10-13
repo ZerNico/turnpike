@@ -234,6 +234,10 @@ export class GuildQueue {
     leaveChannel(this.connection, this.player);
   }
 
+  isDestroyed(): boolean {
+    return this.destroyed;
+  }
+
   handleExternalDestroyed(): void {
     if (this.destroyed) return;
     this.teardown();

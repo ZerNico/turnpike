@@ -76,39 +76,57 @@ export async function replyWithTrackStatus(
 
 const RESOLVE_CONCURRENCY = 8;
 
-// Resolves in ordered batches so playback can start after the first batch
+export interface BulkEnqueueResult {
+  added: number;
+  failed: number;
+  stopped: boolean;
+}
+
+// Resolves in ordered batches so playback can start after the first batch.
+// Stops early if the queue is torn down (e.g. /stop) while loading.
 export async function enqueueMultiple(
   queue: GuildQueue,
   results: SearchResult[],
   provider: SearchProvider,
   userId: string,
-) {
+): Promise<BulkEnqueueResult> {
+  let added = 0;
   let failed = 0;
   for (let i = 0; i < results.length; i += RESOLVE_CONCURRENCY) {
+    if (queue.isDestroyed()) return { added, failed, stopped: true };
+
     const batch = results.slice(i, i + RESOLVE_CONCURRENCY);
     const settled = await Promise.allSettled(
       batch.map((result) => provider.resolve(result, userId)),
     );
 
     for (const outcome of settled) {
-      if (outcome.status === "fulfilled") {
-        queue.enqueue(outcome.value);
-      } else {
+      if (outcome.status === "rejected") {
         failed++;
+      } else if (!queue.isDestroyed()) {
+        queue.enqueue(outcome.value);
+        added++;
       }
     }
   }
-  return { added: results.length - failed, failed };
+  return { added, failed, stopped: queue.isDestroyed() };
 }
 
 export function formatBulkAddReply(
   emoji: string,
-  added: number,
   label: string,
   name: string,
   totalDuration: number,
-  failed: number,
+  { added, failed, stopped }: BulkEnqueueResult,
 ): string {
+  if (stopped) {
+    return formatCommandReply(
+      "⏹️",
+      `Stopped loading ${label}.`,
+      `**${name}**: playback was stopped after adding ${formatTrackCount(added)}.`,
+    );
+  }
+
   let msg = formatCommandReply(
     emoji,
     `Added ${formatTrackCount(added)} from ${label}.`,

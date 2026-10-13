@@ -96,15 +96,10 @@ export const play: Command = {
           return;
         }
 
-        const { added, failed } = await enqueueMultiple(
-          queue,
-          results,
-          ytProvider,
-          interaction.user.id,
-        );
+        const result = await enqueueMultiple(queue, results, ytProvider, interaction.user.id);
         const totalDuration = results.reduce((sum, r) => sum + r.duration, 0);
         await interaction.editReply(
-          formatBulkAddReply("📋", added, "YouTube playlist", name, totalDuration, failed),
+          formatBulkAddReply("📋", "YouTube playlist", name, totalDuration, result),
         );
         return;
       }
@@ -167,7 +162,7 @@ export const play: Command = {
             return;
           }
 
-          const { added, failed } = await enqueueMultiple(
+          const result = await enqueueMultiple(
             queue,
             results,
             spotifyProvider,
@@ -176,7 +171,7 @@ export const play: Command = {
           const totalDuration = results.reduce((sum, r) => sum + r.duration, 0);
           const emoji = parsed.type === "album" ? "💿" : "📋";
           await interaction.editReply(
-            formatBulkAddReply(emoji, added, `Spotify ${parsed.type}`, name, totalDuration, failed),
+            formatBulkAddReply(emoji, `Spotify ${parsed.type}`, name, totalDuration, result),
           );
           return;
         }
