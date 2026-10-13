@@ -1,7 +1,12 @@
 import { SlashCommandBuilder } from "discord.js";
 import type { Command } from "../types.ts";
 import { queueManager } from "../services/queue.ts";
-import { formatCommandReply, formatTrackSummary, replyEphemeral } from "../utils.ts";
+import {
+  formatCommandReply,
+  formatTrackSummary,
+  replyEphemeral,
+  ensureInBotChannel,
+} from "../utils.ts";
 
 export const unskipCmd: Command = {
   data: new SlashCommandBuilder().setName("unskip").setDescription("Go back to the previous track"),
@@ -21,6 +26,8 @@ export const unskipCmd: Command = {
       await replyEphemeral(interaction, formatCommandReply("⚠️", "Nothing is playing right now."));
       return;
     }
+
+    if (!(await ensureInBotChannel(interaction, queue))) return;
 
     if (queue.history.length === 0) {
       await replyEphemeral(

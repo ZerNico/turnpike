@@ -1,7 +1,7 @@
 import type { Track } from "./types.ts";
 import type { SearchResult, SearchProvider } from "./providers/base.ts";
 import type { GuildQueue } from "./services/queue.ts";
-import { MessageFlags } from "discord.js";
+import { GuildMember, MessageFlags } from "discord.js";
 import type { ChatInputCommandInteraction } from "discord.js";
 
 export function formatDuration(seconds: number): string {
@@ -30,6 +30,25 @@ export async function replyEphemeral(
     content,
     flags: MessageFlags.Ephemeral,
   });
+}
+
+/**
+ * Only members in the bot's voice channel may control playback. Replies with an
+ * ephemeral error and returns false otherwise.
+ */
+export async function ensureInBotChannel(
+  interaction: ChatInputCommandInteraction,
+  queue: GuildQueue,
+): Promise<boolean> {
+  const member = interaction.member;
+  const channelId = member instanceof GuildMember ? member.voice.channelId : null;
+  if (channelId === queue.voiceChannelId) return true;
+
+  await replyEphemeral(
+    interaction,
+    formatCommandReply("⚠️", "Join my voice channel first.", `I'm in <#${queue.voiceChannelId}>.`),
+  );
+  return false;
 }
 
 export async function replyWithTrackStatus(

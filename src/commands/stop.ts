@@ -1,7 +1,12 @@
 import { SlashCommandBuilder } from "discord.js";
 import type { Command } from "../types.ts";
 import { queueManager } from "../services/queue.ts";
-import { formatCommandReply, formatTrackCount, replyEphemeral } from "../utils.ts";
+import {
+  formatCommandReply,
+  formatTrackCount,
+  replyEphemeral,
+  ensureInBotChannel,
+} from "../utils.ts";
 
 export const stop: Command = {
   data: new SlashCommandBuilder()
@@ -23,6 +28,8 @@ export const stop: Command = {
       await replyEphemeral(interaction, formatCommandReply("⚠️", "Nothing is playing right now."));
       return;
     }
+
+    if (!(await ensureInBotChannel(interaction, queue))) return;
 
     const info = queue.getInfo();
     const trackCount = info.size + (info.currentTrack ? 1 : 0);

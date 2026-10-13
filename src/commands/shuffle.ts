@@ -1,7 +1,12 @@
 import { SlashCommandBuilder } from "discord.js";
 import type { Command } from "../types.ts";
 import { queueManager } from "../services/queue.ts";
-import { formatCommandReply, formatTrackCount, replyEphemeral } from "../utils.ts";
+import {
+  formatCommandReply,
+  formatTrackCount,
+  replyEphemeral,
+  ensureInBotChannel,
+} from "../utils.ts";
 
 export const shuffleCmd: Command = {
   data: new SlashCommandBuilder()
@@ -26,6 +31,8 @@ export const shuffleCmd: Command = {
       );
       return;
     }
+
+    if (!(await ensureInBotChannel(interaction, queue))) return;
 
     const count = queue.shuffle();
     await interaction.reply(

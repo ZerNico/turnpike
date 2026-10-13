@@ -1,7 +1,7 @@
 import { SlashCommandBuilder } from "discord.js";
 import type { Command } from "../types.ts";
 import { queueManager } from "../services/queue.ts";
-import { formatCommandReply, replyEphemeral } from "../utils.ts";
+import { formatCommandReply, replyEphemeral, ensureInBotChannel } from "../utils.ts";
 
 export const pauseCmd: Command = {
   data: new SlashCommandBuilder().setName("pause").setDescription("Pause or resume playback"),
@@ -21,6 +21,8 @@ export const pauseCmd: Command = {
       await replyEphemeral(interaction, formatCommandReply("⚠️", "Nothing is playing right now."));
       return;
     }
+
+    if (!(await ensureInBotChannel(interaction, queue))) return;
 
     if (queue.isPaused()) {
       queue.resume();

@@ -10,6 +10,7 @@ import {
   replyWithTrackStatus,
   enqueueMultiple,
   formatBulkAddReply,
+  ensureInBotChannel,
   replyEphemeral,
 } from "../utils.ts";
 
@@ -70,6 +71,9 @@ export const play: Command = {
       );
       return;
     }
+
+    const existing = queueManager.get(interaction.guildId);
+    if (existing && !(await ensureInBotChannel(interaction, existing))) return;
 
     const query = interaction.options.getString("query", true);
     await interaction.deferReply();

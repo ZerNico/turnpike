@@ -6,6 +6,7 @@ import {
   formatTrackCount,
   formatTrackSummary,
   replyEphemeral,
+  ensureInBotChannel,
 } from "../utils.ts";
 
 export const removeCmd: Command = {
@@ -35,6 +36,8 @@ export const removeCmd: Command = {
       await replyEphemeral(interaction, formatCommandReply("⚠️", "The queue is empty."));
       return;
     }
+
+    if (!(await ensureInBotChannel(interaction, queue))) return;
 
     const position = interaction.options.getInteger("position", true);
     const removed = queue.remove(position);

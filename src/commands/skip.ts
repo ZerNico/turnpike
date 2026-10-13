@@ -6,6 +6,7 @@ import {
   formatTrackCount,
   formatTrackSummary,
   replyEphemeral,
+  ensureInBotChannel,
 } from "../utils.ts";
 
 export const skipCmd: Command = {
@@ -34,6 +35,8 @@ export const skipCmd: Command = {
       await replyEphemeral(interaction, formatCommandReply("⚠️", "Nothing is playing right now."));
       return;
     }
+
+    if (!(await ensureInBotChannel(interaction, queue))) return;
 
     const count = interaction.options.getInteger("count") ?? 1;
     const { skipped, next } = queue.skip(count);
