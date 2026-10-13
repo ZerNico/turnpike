@@ -92,6 +92,12 @@ docker run --env-file .env -v turnpike-data:/app/data turnpike
 
 The `-v turnpike-data:/app/data` mount persists the SQLite database across container restarts.
 
+The container updates yt-dlp to the latest stable release on every start, and logs the version in use. To use a specific release or channel instead, set `YTDLP_VERSION` (anything `yt-dlp --update-to` accepts, e.g. `2025.01.15`, `nightly`, or `stable@2025.01.15`):
+
+```bash
+docker run --env-file .env -v turnpike-data:/app/data -e YTDLP_VERSION=nightly turnpike
+```
+
 With cookies:
 
 ```bash
