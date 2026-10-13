@@ -10,7 +10,27 @@ env:
   IMAGE_NAME: zernico/turnpike
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+
+      - run: bun install --frozen-lockfile
+
+      - run: bun run lint
+
+      - run: bun run fmt:check
+
+      - run: bun run typecheck
+
+      - run: bun run test
+
   build:
+    needs: check
     runs-on: ubuntu-latest
     permissions:
       contents: read
