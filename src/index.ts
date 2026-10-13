@@ -113,6 +113,11 @@ client.on(Events.VoiceStateUpdate, (oldState, newState) => {
   const queue = queueManager.get(guildId);
   if (!queue) return;
 
+  // Follow the bot when it gets moved to another channel
+  if (newState.id === newState.client.user.id && newState.channelId) {
+    queue.setVoiceChannel(newState.channelId);
+  }
+
   // Only react when the change touches the channel the bot is in
   const botChannelId = queue.voiceChannelId;
   if (oldState.channelId !== botChannelId && newState.channelId !== botChannelId) return;

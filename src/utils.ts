@@ -55,6 +55,9 @@ export async function replyWithTrackStatus(
   }
 }
 
+const RESOLVE_CONCURRENCY = 8;
+
+// Resolves in ordered batches so playback can start after the first batch
 export async function enqueueMultiple(
   queue: GuildQueue,
   results: SearchResult[],
@@ -62,12 +65,18 @@ export async function enqueueMultiple(
   userId: string,
 ) {
   let failed = 0;
-  for (const result of results) {
-    try {
-      const track = await provider.resolve(result, userId);
-      queue.enqueue(track);
-    } catch {
-      failed++;
+  for (let i = 0; i < results.length; i += RESOLVE_CONCURRENCY) {
+    const batch = results.slice(i, i + RESOLVE_CONCURRENCY);
+    const settled = await Promise.allSettled(
+      batch.map((result) => provider.resolve(result, userId)),
+    );
+
+    for (const outcome of settled) {
+      if (outcome.status === "fulfilled") {
+        queue.enqueue(outcome.value);
+      } else {
+        failed++;
+      }
     }
   }
   return { added: results.length - failed, failed };

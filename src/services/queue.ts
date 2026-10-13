@@ -1,5 +1,5 @@
 import { AudioPlayerStatus } from "@discordjs/voice";
-import type { AudioPlayer, VoiceConnection } from "@discordjs/voice";
+import type { AudioPlayer, AudioResource, VoiceConnection } from "@discordjs/voice";
 import type { Client, VoiceBasedChannel } from "discord.js";
 import { DiscordAPIError } from "discord.js";
 import { eq } from "drizzle-orm";
@@ -15,6 +15,7 @@ const IDLE_TIMEOUT_MS = 2 * 60 * 1000;
 const EMPTY_CHANNEL_TIMEOUT_MS = 60 * 1000;
 const POSITION_CHECKPOINT_MS = 10 * 1000;
 const RESUME_END_BUFFER_SECONDS = 5;
+const MAX_HISTORY = 100;
 
 // Discord API codes: 10003 = Unknown Channel, 10004 = Unknown Guild
 function isMissingResourceError(error: unknown): boolean {
@@ -75,7 +76,7 @@ export class GuildQueue {
   readonly guildId: string;
   readonly player: AudioPlayer;
   readonly connection: VoiceConnection;
-  readonly voiceChannelId: string;
+  voiceChannelId: string;
   readonly textChannelId: string;
   tracks: Track[];
   history: Track[];
@@ -87,6 +88,10 @@ export class GuildQueue {
   private resumePositionSeconds = 0;
   private playbackOffsetSeconds = 0;
   private startPaused = false;
+  // pause() only works once the player is Playing, so a pause requested while
+  // the resource is still buffering is applied when playback starts
+  private pendingPauseResource: AudioResource | null = null;
+  private destroyed = false;
 
   constructor(
     private readonly manager: QueueManager,
@@ -115,11 +120,20 @@ export class GuildQueue {
     this.currentTrack = currentTrack;
 
     this.player.on(AudioPlayerStatus.Idle, () => {
+      if (this.destroyed) return;
       this.playNext();
+    });
+
+    this.player.on(AudioPlayerStatus.Playing, (_oldState, newState) => {
+      if (this.pendingPauseResource && newState.resource === this.pendingPauseResource) {
+        this.pendingPauseResource = null;
+        this.player.pause();
+      }
     });
 
     this.player.on("error", (error) => {
       console.error(`[Queue ${this.guildId}] Player error:`, error.message);
+      if (this.destroyed) return;
       this.playNext();
     });
   }
@@ -140,7 +154,7 @@ export class GuildQueue {
     this.clearIdleTimeout();
 
     if (this.currentTrack) {
-      this.history.push(this.currentTrack);
+      this.pushHistory(this.currentTrack);
     }
 
     while (this.tracks.length > 0) {
@@ -155,7 +169,7 @@ export class GuildQueue {
       try {
         const resource = createTrackResource(next, startSeconds, this.sponsorblockEnabled);
         this.player.play(resource);
-        if (startPaused) this.player.pause();
+        if (startPaused) this.pendingPauseResource = resource;
         this.persist();
         return next;
       } catch (error) {
@@ -183,7 +197,7 @@ export class GuildQueue {
     if (!this.currentTrack) return { skipped: [], next: null };
 
     const skipped: Track[] = [this.currentTrack];
-    this.history.push(this.currentTrack);
+    this.pushHistory(this.currentTrack);
     this.clearCurrent();
 
     const toDrop = Math.min(count - 1, this.tracks.length);
@@ -191,27 +205,34 @@ export class GuildQueue {
       skipped.push(...this.tracks.splice(0, toDrop));
     }
 
-    this.persist();
-    this.player.stop(); // triggers Idle → playNext
+    const next = this.tracks[0] ?? null;
 
-    return { skipped, next: this.tracks[0] ?? null };
+    this.persist();
+    // force, otherwise a paused player never reaches Idle; triggers Idle → playNext
+    this.player.stop(true);
+
+    return { skipped, next };
   }
 
   destroy(): void {
-    this.reset();
+    if (this.destroyed) return;
+    this.teardown();
     leaveChannel(this.connection, this.player);
-    this.manager.unregister(this.guildId);
-    this.manager.deletePersistedQueue(this.guildId);
   }
 
   handleExternalDestroyed(): void {
-    this.reset();
-    this.manager.unregister(this.guildId);
-    this.manager.deletePersistedQueue(this.guildId);
+    if (this.destroyed) return;
+    this.teardown();
+    this.player.stop(true);
   }
 
   pause(): boolean {
-    const paused = this.player.pause();
+    let paused = this.player.pause();
+    const state = this.player.state;
+    if (!paused && this.currentTrack && state.status === AudioPlayerStatus.Buffering) {
+      this.pendingPauseResource = state.resource;
+      paused = true;
+    }
     if (paused) {
       this.persist();
     }
@@ -219,6 +240,12 @@ export class GuildQueue {
   }
 
   resume(): boolean {
+    if (this.pendingPauseResource) {
+      this.pendingPauseResource = null;
+      this.persist();
+      return true;
+    }
+
     const resumed = this.player.unpause();
     if (resumed) {
       this.persist();
@@ -286,6 +313,13 @@ export class GuildQueue {
    * channel. When everyone leaves, start a grace-period timer that disconnects
    * the bot; if someone (re)joins before it fires, cancel the timer.
    */
+  /** Track the bot being moved to a different voice channel. */
+  setVoiceChannel(channelId: string): void {
+    if (channelId === this.voiceChannelId) return;
+    this.voiceChannelId = channelId;
+    this.persist();
+  }
+
   handleListenerCountChange(humanListeners: number): void {
     if (humanListeners > 0) {
       this.clearEmptyChannelTimeout();
@@ -326,16 +360,27 @@ export class GuildQueue {
   }
 
   getCurrentPlaybackSeconds(): number {
+    if (!this.currentTrack) return 0;
+
     const state = this.player.state;
-    if (state.status === AudioPlayerStatus.Playing || state.status === AudioPlayerStatus.Paused) {
+    if (
+      state.status === AudioPlayerStatus.Playing ||
+      state.status === AudioPlayerStatus.Paused ||
+      state.status === AudioPlayerStatus.AutoPaused
+    ) {
       return this.playbackOffsetSeconds + Math.floor(state.playbackDuration / 1000);
     }
 
-    return this.currentTrack ? this.resumePositionSeconds : 0;
+    // still buffering: playback starts at the offset
+    return this.playbackOffsetSeconds;
   }
 
   isPaused(): boolean {
-    return this.player.state.status === AudioPlayerStatus.Paused || this.startPaused;
+    return (
+      this.player.state.status === AudioPlayerStatus.Paused ||
+      this.pendingPauseResource !== null ||
+      this.startPaused
+    );
   }
 
   restoreState(tracks: Track[], history: Track[], resume: ResumeState | null): void {
@@ -361,6 +406,20 @@ export class GuildQueue {
     this.manager.persistQueue(this);
   }
 
+  private teardown(): void {
+    this.destroyed = true;
+    this.reset();
+    this.manager.unregister(this.guildId);
+    this.manager.deletePersistedQueue(this.guildId);
+  }
+
+  private pushHistory(track: Track): void {
+    this.history.push(track);
+    if (this.history.length > MAX_HISTORY) {
+      this.history.splice(0, this.history.length - MAX_HISTORY);
+    }
+  }
+
   private reset(): void {
     this.clearIdleTimeout();
     this.clearEmptyChannelTimeout();
@@ -374,6 +433,7 @@ export class GuildQueue {
     this.playbackOffsetSeconds = 0;
     this.resumePositionSeconds = 0;
     this.startPaused = false;
+    this.pendingPauseResource = null;
   }
 
   private clearIdleTimeout(): void {
@@ -448,9 +508,13 @@ export class GuildQueue {
 
 export class QueueManager {
   private queues = new Map<string, GuildQueue>();
+  // only the playback position changes between explicit persists, and it only
+  // advances while playing
   private checkpointTimer = setInterval(() => {
     for (const queue of this.queues.values()) {
-      this.persistQueue(queue);
+      if (queue.player.state.status === AudioPlayerStatus.Playing) {
+        this.persistQueue(queue);
+      }
     }
   }, POSITION_CHECKPOINT_MS);
 
@@ -545,10 +609,17 @@ export class QueueManager {
           continue;
         }
 
-        const queue = this.getOrCreate(row.guildId, channel, row.textChannelId);
         const tracks = row.tracks ?? [];
         const history = row.history ?? [];
         const resume = buildResumeState(row.currentTrack, row.currentPositionSeconds, row.paused);
+
+        // nothing left to play, so don't rejoin just to sit idle
+        if (!resume && tracks.length === 0) {
+          this.deletePersistedQueue(row.guildId);
+          continue;
+        }
+
+        const queue = this.getOrCreate(row.guildId, channel, row.textChannelId);
 
         if (resume) {
           queue.restoreState(tracks, history, resume);
@@ -558,10 +629,8 @@ export class QueueManager {
           queue.restoreState(tracks, history, null);
         }
 
-        if (queue.tracks.length > 0) {
-          queue.playNext();
-          restored++;
-        }
+        queue.playNext();
+        restored++;
       } catch (error) {
         console.error(`[Restore] Failed to restore queue for guild ${row.guildId}:`, error);
         if (isMissingResourceError(error)) {

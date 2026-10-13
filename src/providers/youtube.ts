@@ -37,7 +37,10 @@ export class YouTubeProvider implements SearchProvider {
   }
 
   static isPlaylistUrl(input: string): boolean {
-    return YOUTUBE_PLAYLIST_RE.test(input.trim());
+    const listId = input.trim().match(YOUTUBE_PLAYLIST_RE)?.[1];
+    // auto-generated Mix/Radio lists (RD...) can't be fetched, so treat those
+    // links as the single video they point to
+    return !!listId && !listId.startsWith("RD");
   }
 
   async getPlaylist(url: string): Promise<{ name: string; results: SearchResult[] }> {

@@ -67,6 +67,8 @@ export function createTrackResource(track: Track, startSeconds = 0, sponsorblock
   };
 
   ffmpeg.stdout!.on("end", cleanup);
+  // a skipped or replaced resource is destroyed, which only emits "close"
+  ffmpeg.stdout!.on("close", cleanup);
   ffmpeg.stdout!.on("error", cleanup);
   ytdlp.stdout!.on("error", cleanup);
   ytdlp.on("error", cleanup);
