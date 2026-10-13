@@ -50,5 +50,7 @@ export function joinChannel(
 
 export function leaveChannel(connection: VoiceConnection, player: AudioPlayer): void {
   player.stop(true);
-  connection.destroy();
+  if (connection.state.status !== VoiceConnectionStatus.Destroyed) {
+    connection.destroy();
+  }
 }

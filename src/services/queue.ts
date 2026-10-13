@@ -220,6 +220,20 @@ export class GuildQueue {
     leaveChannel(this.connection, this.player);
   }
 
+  /**
+   * Leave voice for a process shutdown while keeping the persisted queue, so
+   * the session resumes from this exact position on the next start.
+   */
+  suspend(): void {
+    if (this.destroyed) return;
+    this.persist();
+    this.destroyed = true;
+    this.clearIdleTimeout();
+    this.clearEmptyChannelTimeout();
+    this.manager.unregister(this.guildId);
+    leaveChannel(this.connection, this.player);
+  }
+
   handleExternalDestroyed(): void {
     if (this.destroyed) return;
     this.teardown();
@@ -589,6 +603,18 @@ export class QueueManager {
 
   destroy(guildId: string): void {
     this.queues.get(guildId)?.destroy();
+  }
+
+  /** Persist and leave every session; they are restored on the next start. */
+  shutdown(): void {
+    clearInterval(this.checkpointTimer);
+    for (const queue of [...this.queues.values()]) {
+      try {
+        queue.suspend();
+      } catch (error) {
+        console.error(`[Shutdown] Failed to suspend queue for guild ${queue.guildId}:`, error);
+      }
+    }
   }
 
   async restore(client: Client): Promise<number> {

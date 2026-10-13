@@ -175,4 +175,26 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
+let shuttingDown = false;
+
+// Persist sessions and leave voice cleanly so they resume on the next start
+async function shutdown(signal: string) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+
+  console.log(`🛑 Received ${signal}, shutting down...`);
+  queueManager.shutdown();
+
+  try {
+    await client.destroy();
+  } catch (error) {
+    console.error("Failed to destroy client:", error);
+  }
+
+  process.exit(0);
+}
+
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
+process.on("SIGINT", () => void shutdown("SIGINT"));
+
 client.login(config.token);
